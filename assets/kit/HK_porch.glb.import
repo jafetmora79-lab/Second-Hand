@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://b2hr3q4t1a8nq"
-path="res://.godot/imported/HOUSE_farmhouse.glb-d38055c687d242da86cf620948df6233.scn"
+uid="uid://nhbm0qa2b6nw"
+path="res://.godot/imported/HK_porch.glb-605314080d6c149ee03e39f2fb66755c.scn"
 
 [deps]
 
-source_file="res://assets/outside/HOUSE_farmhouse.glb"
-dest_files=["res://.godot/imported/HOUSE_farmhouse.glb-d38055c687d242da86cf620948df6233.scn"]
+source_file="res://assets/kit/HK_porch.glb"
+dest_files=["res://.godot/imported/HK_porch.glb-605314080d6c149ee03e39f2fb66755c.scn"]
 
 [params]
 

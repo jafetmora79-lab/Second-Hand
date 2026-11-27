@@ -19,6 +19,17 @@ static func _mat(c: Color, rough: float = 0.8, metal: float = 0.0) -> StandardMa
 	m.metallic = metal
 	return m
 
+## A one-sided dark plane facing into the room (yaw 0 faces +z): it fills the chinks between logs seen from inside, and is invisible outside.
+static func _backing(root: Node3D, pos: Vector3, size: Vector2, yaw: float, m: Material) -> void:
+	var mi := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = size
+	mi.mesh = q
+	mi.material_override = m
+	mi.position = pos
+	mi.rotation.y = yaw
+	root.add_child(mi)
+
 static func _box(root: Node3D, pos: Vector3, size: Vector3, m: Material) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var b := BoxMesh.new()
@@ -46,16 +57,17 @@ static func build(root: Node3D) -> Dictionary:
 				c.rotation.x = PI
 	_box(shop, Vector3(0, 3.0, -1.5), Vector3(6.4, 0.06, 5.4), dark)          ## the roof boards above it, so no sky shows between planks
 	# behind every wall, a dark backing: the rounded logs and the joints between kit pieces never show daylight
+	# (one-sided planes facing into the room: from outside they vanish and the logs' own outer face shows)
 	var back := _mat(Color(0.16, 0.11, 0.08))
-	_box(shop, Vector3(-3.16, 1.45, -1.5), Vector3(0.06, 3.0, 5.4), back)
-	_box(shop, Vector3(3.16, 1.45, -1.5), Vector3(0.06, 3.0, 5.4), back)
-	_box(shop, Vector3(0, 1.45, 1.16), Vector3(6.4, 3.0, 0.06), back)
-	_box(shop, Vector3(-0.72, 1.45, -4.16), Vector3(2.04, 3.0, 0.06), back)                     ## back wall, round the door and the window
-	_box(shop, Vector3(-2.91, 1.45, -4.16), Vector3(0.5, 3.0, 0.06), back)
-	_box(shop, Vector3(DOOR.x, 2.7, -4.16), Vector3(DOOR_W + 0.1, 0.6, 0.06), back)
-	_box(shop, Vector3(2.83, 1.45, -4.16), Vector3(0.66, 3.0, 0.06), back)
-	_box(shop, Vector3(1.4, 0.43, -4.16), Vector3(2.2, 0.86, 0.06), back)
-	_box(shop, Vector3(1.4, 2.62, -4.16), Vector3(2.2, 0.77, 0.06), back)
+	_backing(shop, Vector3(-3.16, 1.45, -1.5), Vector2(5.4, 3.0), PI * 0.5, back)
+	_backing(shop, Vector3(3.16, 1.45, -1.5), Vector2(5.4, 3.0), -PI * 0.5, back)
+	_backing(shop, Vector3(0, 1.45, 1.16), Vector2(6.4, 3.0), PI, back)
+	_backing(shop, Vector3(-0.72, 1.45, -4.16), Vector2(2.04, 3.0), 0.0, back)                  ## back wall, round the door and the window
+	_backing(shop, Vector3(-2.91, 1.45, -4.16), Vector2(0.5, 3.0), 0.0, back)
+	_backing(shop, Vector3(DOOR.x, 2.7, -4.16), Vector2(DOOR_W + 0.1, 0.6), 0.0, back)
+	_backing(shop, Vector3(2.83, 1.45, -4.16), Vector2(0.66, 3.0), 0.0, back)
+	_backing(shop, Vector3(1.4, 0.43, -4.16), Vector2(2.2, 0.86), 0.0, back)
+	_backing(shop, Vector3(1.4, 2.62, -4.16), Vector2(2.2, 0.77), 0.0, back)
 	# the back wall: the doorway wall round the door, and the shop-window wall round the big window (opening about x 0.3..2.5, y 0.87..2.23)
 	_kit(shop, "HK_wall_door", Vector3(DOOR.x, -0.05, -4.0), 0.0, Vector3(3.0, 2.95, 0.2))
 	_kit(shop, "HK_wall_shop", Vector3(1.4, -0.05, -4.02), 0.0, Vector3(3.86, 2.95, 0.2))
@@ -178,6 +190,12 @@ static func _glass_counter(shop: Node3D) -> Array:
 	return spots
 
 ## A Timberline house-kit piece (assets/kit), stretched to `size` (x along it, y up, z through it), bottom at pos.y, centred on pos.
+## A kit piece on a given render layer (the outside one for buildings in the town), toned like the shop's.
+static func _kit_layer(root: Node3D, piece: String, pos: Vector3, yaw: float, size: Vector3, layer: int) -> Node3D:
+	var n := _prop(root, "kit/" + piece, pos, 0.0, yaw, layer, size)
+	_grade(n, KIT_GRADE)
+	return n
+
 static func _kit(root: Node3D, piece: String, pos: Vector3, yaw: float, size: Vector3) -> Node3D:
 	var n := _prop(root, "kit/" + piece, pos, 0.0, yaw, 1, size)
 	_grade(n, KIT_GRADE)
@@ -240,7 +258,7 @@ static func _dress(shop: Node3D) -> void:
 	_prop(shop, "shop/HK_barrel_crate", Vector3(2.15, 0, -1.25), 0.8, 0.4)
 	_prop(shop, "shop/TOOL_axe", Vector3(2.85, 0, -0.55), 0.85, 0.3)
 	# outside the door
-	_prop(shop, "shop/HK_steps", Vector3(DOOR.x, -0.25, -4.55), 0.3, PI, 2)
+	_kit_layer(shop, "HK_porch", Vector3(DOOR.x, -0.2, -5.25), PI, Vector3(2.6, 2.75, 2.3), 2)      ## a covered porch at the door, its deck level with the floor
 	_prop(shop, "shop/HK_mailbox", Vector3(DOOR.x - 1.0, 0, -4.7), 1.1, PI, 2)
 	_prop(shop, "shop/HK_lantern", Vector3(DOOR.x + 0.75, 1.75, -4.12), 0.32, PI, 2)
 	var porch := OmniLight3D.new()                                   ## the porch lamp: lights whoever is waiting outside (outside layer only)

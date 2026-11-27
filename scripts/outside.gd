@@ -83,7 +83,6 @@ static func build(root: Node3D) -> Node3D:
 	lane.size = Vector2(120, 3.2)
 	_mesh(out, lane, Vector3(10, 0.01, -7.6), lane_m)
 	# across the lane: a cottage, and a fence along it
-	_place(out, "HOUSE_cottage", Vector3(5.0, 0, -44.0), 6.2, -0.6)
 	var wood := StandardMaterial3D.new()
 	wood.albedo_color = Color(0.3, 0.21, 0.15)
 	var post := BoxMesh.new()
@@ -106,10 +105,11 @@ static func build(root: Node3D) -> Node3D:
 		_place(out, "TREE_meshy_pine", Vector3(x, 0, z), rng.randf_range(7.0, 13.0), rng.randf() * TAU)
 	# the rest of the town along the lane, and the forest behind it: this is what the door's window looks out on (left of the
 	# shop window's view, about x = -0.55 |z| from behind the counter)
-	_place(out, "HOUSE_aframe", Vector3(-7.5, 0, -15.0), 5.5, 0.4)
-	_place(out, "HOUSE_farmhouse", Vector3(-17.0, 0, -27.0), 7.0, -0.3)
-	_place(out, "HOUSE_cottage", Vector3(-30.0, 0, -45.0), 6.0, 0.8)
-	_place(out, "HOUSE_aframe", Vector3(6.0, 0, -24.0), 5.0, -0.5)
+	cabin(out, Vector3(-7.5, 0, -15.5), 0.35, 6.0, 5.0)
+	cabin(out, Vector3(-17.0, 0, -27.5), -0.25, 7.5, 6.0)
+	cabin(out, Vector3(-30.0, 0, -45.0), 0.7, 6.5, 5.5)
+	cabin(out, Vector3(6.5, 0, -24.0), -0.45, 6.0, 5.0)
+	cabin(out, Vector3(5.0, 0, -44.0), -0.6, 6.5, 5.5)
 	for i in 45:
 		var z2 := -rng.randf_range(11.0, 110.0)
 		var x2 := -absf(z2) * rng.randf_range(0.25, 1.1) - 2.5
@@ -155,6 +155,37 @@ static func build(root: Node3D) -> Node3D:
 	flakes.layers = LAYER
 	out.add_child(flakes)
 	return out
+
+## A log cabin from Timberline's house kit (assets/kit), put together the way Timberline builds its town: chinked log walls, a pitched
+## roof section with a log gable at each end, a panelled door and shuttered windows on the front, a brick chimney up one end, a porch.
+## `pos` is the middle of the floor, the front (door) faces +z turned by `yaw`; w across the front, d deep. Outside layer only.
+static func cabin(parent: Node3D, pos: Vector3, yaw: float, w: float, d: float) -> Node3D:
+	var c := Node3D.new()
+	c.position = pos
+	c.rotation.y = yaw
+	parent.add_child(c)
+	var h := 2.6
+	var hx := w * 0.5
+	var hz := d * 0.5
+	var k := func(piece: String, p: Vector3, y: float, size: Vector3) -> void:
+		Shop._kit_layer(c, piece, p, y, size, LAYER)
+	k.call("HK_wall_plain", Vector3(0, -0.1, -hz), PI, Vector3(w + 0.4, h + 0.1, 0.4))
+	k.call("HK_wall_plain", Vector3(0, -0.1, hz), 0.0, Vector3(w + 0.4, h + 0.1, 0.4))
+	k.call("HK_wall_chinked", Vector3(-hx, -0.1, 0), -PI * 0.5, Vector3(d, h + 0.1, 0.4))
+	k.call("HK_wall_chinked", Vector3(hx, -0.1, 0), PI * 0.5, Vector3(d, h + 0.1, 0.4))
+	var span := d + 1.0
+	var rise := span * 0.38
+	k.call("HK_roof_section", Vector3(0, h - 0.4, 0), PI * 0.5, Vector3(span, rise, w + 0.8))
+	for gs: float in [-1.0, 1.0]:
+		k.call("HK_gable", Vector3(gs * (hx + 0.02), h - 0.38, 0), gs * PI * 0.5, Vector3(span - 0.12, rise - 0.02, 0.4))
+	k.call("HK_door", Vector3(0, 0.1, hz + 0.12), 0.0, Vector3(1.25, 2.2, 0.5))
+	for ws: float in [-1.0, 1.0]:
+		k.call("HK_window", Vector3(ws * w * 0.31, 0.85, hz + 0.15), 0.0, Vector3(1.9, 1.35, 0.3))
+	k.call("HK_window", Vector3(hx + 0.15, 0.85, 0), PI * 0.5, Vector3(1.9, 1.35, 0.3))
+	k.call("HK_window", Vector3(-hx - 0.15, 0.85, 0), -PI * 0.5, Vector3(1.9, 1.35, 0.3))
+	k.call("HK_chimney_brick", Vector3(-(hx + 0.55), -0.1, 0), 0.0, Vector3(1.1, h + rise + 0.8, 1.1))
+	k.call("HK_porch", Vector3(0, 0.0, hz + 1.5), 0.0, Vector3(minf(w - 1.0, 4.2), 2.6, 3.0))
+	return c
 
 ## The winter sky behind it all, with haze that swallows the far peaks a little. Applied to the shop's environment
 ## (inside, the walls hide the sky and the fog is too thin over a few metres to notice).

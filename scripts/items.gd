@@ -54,7 +54,7 @@ const KINDS := {
 	"snow_globe": {
 		"name": "Snow globe", "cat": "curios", "base": 60, "fake_value": 5,
 		"clues": [
-			{"id": "plate", "from": "front", "at": Vector2(0.0, -0.58), "pos": Vector3(0, -0.035, 0.05), "text": "The brass plate reads \"Pinecrest 1952\": made here in town, at the Pinecrest works.", "mult": 1.7, "label": "PINECREST\n1952", "ink": "struck", "tex": "snow_globe/pinecrest_1952", "w": 0.06, "face": "front"},
+			{"id": "plate", "from": "front", "at": Vector2(0.0, -0.655), "pos": Vector3(0, -0.035, 0.05), "text": "The brass plate reads \"Pinecrest 1952\": made here in town, at the Pinecrest works.", "mult": 1.7, "label": "PINECREST\n1952", "ink": "struck", "tex": "snow_globe/pinecrest_1952", "w": 0.06, "face": "front"},
 			{"id": "water", "from": "top", "at": Vector2(0.0, 0.0), "pos": Vector3(0.0, 0.07, 0.0), "text": "An air gap at the top of the dome: some water has leaked out.", "mult": 0.85, "damage": true, "part": "airgap"},
 		],
 	},

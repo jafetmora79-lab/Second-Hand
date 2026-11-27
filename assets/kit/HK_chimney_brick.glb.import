@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://gqhjcr2e376v"
-path="res://.godot/imported/HK_steps.glb-dd5e97d84e5b1fb7a2c8d68006f882a5.scn"
+uid="uid://d377btldfg8pe"
+path="res://.godot/imported/HK_chimney_brick.glb-387afb5515d27d43f0b50d0d807f016d.scn"
 
 [deps]
 
-source_file="res://assets/shop/HK_steps.glb"
-dest_files=["res://.godot/imported/HK_steps.glb-dd5e97d84e5b1fb7a2c8d68006f882a5.scn"]
+source_file="res://assets/kit/HK_chimney_brick.glb"
+dest_files=["res://.godot/imported/HK_chimney_brick.glb-387afb5515d27d43f0b50d0d807f016d.scn"]
 
 [params]
 

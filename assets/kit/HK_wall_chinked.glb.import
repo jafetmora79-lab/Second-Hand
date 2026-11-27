@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://bu031ysbj3yhh"
-path="res://.godot/imported/HOUSE_aframe.glb-4444aed133fdf234be8b2236ff79bc13.scn"
+uid="uid://cdpd7jxuvk8g6"
+path="res://.godot/imported/HK_wall_chinked.glb-99f7058f5741f4a8459dc317d97a768a.scn"
 
 [deps]
 
-source_file="res://assets/outside/HOUSE_aframe.glb"
-dest_files=["res://.godot/imported/HOUSE_aframe.glb-4444aed133fdf234be8b2236ff79bc13.scn"]
+source_file="res://assets/kit/HK_wall_chinked.glb"
+dest_files=["res://.godot/imported/HK_wall_chinked.glb-99f7058f5741f4a8459dc317d97a768a.scn"]
 
 [params]
 
