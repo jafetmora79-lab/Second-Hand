@@ -147,13 +147,12 @@ func _build_tip() -> void:
 	skip.pressed.connect(func() -> void: game.skip_tutorial())
 	h.add_child(skip)
 
-## A tip for the guided first customer. While the inspect or haggle panel fills the right of the screen, it moves to the left.
+## A tip for the guided first customer, top left.
 func show_tip(text: String) -> void:
 	_tip_text.text = text
 	_tip.visible = true
-	var left := (_inspect != null and _inspect.visible) or (_haggle != null and _haggle.visible)
-	_tip.offset_left = -600.0 if left else -190.0
-	_tip.offset_right = 0.0 if left else 410.0
+	_tip.offset_left = -600.0                                  ## top left: clear of the right-hand panels and the monitor's screen
+	_tip.offset_right = 0.0
 
 func hide_tip() -> void:
 	_tip.visible = false
@@ -194,8 +193,7 @@ func _build_feed() -> void:
 func show_door(title: String, look: String, note: String, tex: Texture2D) -> void:
 	_feed_tex.texture = tex
 	_feed_note.text = note
-	_feed.visible = true
-	say(title, look)
+	say(title, look + "\n" + note)                            ## the picture is on the desk monitor, not in a window on screen
 	hide_actions()
 	_action("Buzz them in", func() -> void:
 		hide_actions()

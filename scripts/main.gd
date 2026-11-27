@@ -54,6 +54,7 @@ var look_pitch := 0.0
 var looking := false                       ## dragging the view right now
 var talk_focus := false                    ## a customer is talking: frame them (until the player looks away)
 const VIEW_STATES := ["idle", "walking", "at_door", "talk", "sell", "robbery", "refused"]
+const MONITOR_SNAP := 0.26                 ## look within this angle (radians) of the monitor and the view zooms in to it
 var want_q := Quaternion.IDENTITY          ## where the held object is turning to (drags and the turn buttons set it; it eases there)
 var rest_q := Quaternion.IDENTITY          ## how it lay on the mat, for "Reset"
 const REST_H := 0.15                       ## the object's centre above the mat while it lies there
@@ -214,6 +215,9 @@ func _at_door() -> void:
 	ui.bell()
 	state = "at_door"
 	feed.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	screen_mat.set_shader_parameter("on", 1.0)
+	talk_focus = false
+	_aim_at(monitor_screen)                                ## turn to the monitor to see who it is
 	var id: String = visitor["id"]
 	var r: Dictionary = rep.get(id, {})
 	var title := String(visitor["info"]["name"]) if int(r.get("visits", 0)) > 0 else "Someone at the door"
@@ -239,6 +243,8 @@ func _remember(id: String, what: String) -> void:
 
 func buzz_in() -> void:
 	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	screen_mat.set_shader_parameter("on", 0.0)
+	_aim_at(Vector3.ZERO)
 	ui.hide_feed()
 	_remember(visitor["id"], "visits")
 	state = "walking"
@@ -259,6 +265,8 @@ func buzz_in() -> void:
 
 func turn_away() -> void:
 	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	screen_mat.set_shader_parameter("on", 0.0)
+	_aim_at(Vector3.ZERO)
 	ui.hide_feed()
 	ui.say("", "You leave the door locked. After a moment they turn and trudge off up the lane.")
 	state = "walking"
@@ -292,11 +300,50 @@ func _build_feed() -> void:
 	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(feed)
 	var c := Camera3D.new()
-	c.fov = 62.0
-	var eye := Vector3(PORCH.x + 0.55, 2.05, -4.25)
-	c.transform = Transform3D(Basis.looking_at(PORCH + Vector3(0.0, 0.95, 0) - eye), eye)
+	c.fov = 56.0
+	var eye := Vector3(PORCH.x + 0.5, 1.85, -4.35)          ## just under the porch roof's beam, beside the door
+	c.transform = Transform3D(Basis.looking_at(PORCH + Vector3(0.0, 1.05, 0) - eye), eye)
 	feed.add_child(c)
 	c.current = true
+	_build_monitor()
+
+## The desk on your left behind the counter (Timberline's workbench) with the security monitor on it, its screen showing the porch
+## camera. Look at it and the view zooms in to the screen; when someone rings, the view turns to it by itself.
+## The monitor is a simple boxy CRT until its Meshy model arrives.
+const DESK := Vector3(-1.78, 0.0, -0.72)
+var monitor_screen := Vector3.ZERO           ## the middle of the screen, world space
+var screen_mat: ShaderMaterial
+func _build_monitor() -> void:
+	var node: Node3D = shop["node"]
+	Shop._kit(node, "HK_workbench", DESK, PI * 0.5, Vector3(1.15, 0.78, 0.62))
+	var mon := Node3D.new()
+	mon.name = "Monitor"
+	var top := DESK + Vector3(0, 0.79, 0)
+	mon.position = top
+	var to_eye := SHOP_EYE - top
+	mon.rotation.y = atan2(to_eye.x, to_eye.z)             ## its screen faces you behind the counter
+	node.add_child(mon)
+	var shell := StandardMaterial3D.new()
+	shell.albedo_color = Color(0.58, 0.5, 0.38)
+	shell.roughness = 0.55
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color(0.08, 0.08, 0.08)
+	dark.roughness = 0.4
+	Shop._box(mon, Vector3(0, 0.16, -0.02), Vector3(0.36, 0.3, 0.3), shell)          ## the cabinet
+	Shop._box(mon, Vector3(0, 0.17, 0.132), Vector3(0.3, 0.23, 0.012), dark)         ## the bezel
+	Shop._box(mon, Vector3(0.13, 0.04, 0.135), Vector3(0.05, 0.025, 0.01), dark)     ## a knob strip
+	var screen := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(0.26, 0.195)
+	screen.mesh = q
+	screen_mat = ShaderMaterial.new()
+	screen_mat.shader = load("res://shaders/crt_screen.gdshader") as Shader
+	screen_mat.set_shader_parameter("feed", feed.get_texture())
+	screen_mat.set_shader_parameter("on", 0.0)
+	screen.material_override = screen_mat
+	screen.position = Vector3(0, 0.17, 0.14)
+	mon.add_child(screen)
+	monitor_screen = mon.position + mon.basis * screen.position
 
 ## The shop's own collection in the glass counter, not for sale: one of each kind of object, the real thing.
 func _decorate() -> void:
@@ -516,14 +563,22 @@ func _view(delta: float) -> void:
 	var want := Basis(Vector3.UP, look_yaw) * base * Basis(Vector3.RIGHT, look_pitch)
 	var fov := SHOP_FOV
 	var rate := LOOK_EASE
-	if talk_focus and figure != null and is_instance_valid(figure) and figure.global_position.z > -3.9:
+	var eye := SHOP_EYE
+	var to_mon := (monitor_screen - SHOP_EYE).normalized()
+	if not talk_focus and monitor_screen != Vector3.ZERO and (-want.z).angle_to(to_mon) < MONITOR_SNAP:
+		# looking at the monitor: lean in and zoom until its screen fills the middle of the view
+		eye = SHOP_EYE + to_mon * 0.85
+		want = Basis.looking_at(monitor_screen - Vector3(0, 0.045, 0) - eye)    ## a little low, so the screen sits above the speech box
+		fov = 21.0
+		rate = TALK_EASE
+	elif talk_focus and figure != null and is_instance_valid(figure) and figure.global_position.z > -3.9:
 		var info: Dictionary = visitor.get("info", {})
 		var face := figure.global_position + Vector3(0, float(info.get("height", 1.7)) * 0.9 - 0.08, 0)
 		want = Basis.looking_at(face - SHOP_EYE)
 		fov = SHOP_FOV * TALK_FOV_SCALE
 		rate = TALK_EASE
 	var k := 1.0 - exp(-rate * delta)
-	cam.transform = Transform3D(cam.transform.basis.slerp(want.orthonormalized(), k).orthonormalized(), cam.position.lerp(SHOP_EYE, k))
+	cam.transform = Transform3D(cam.transform.basis.slerp(want.orthonormalized(), k).orthonormalized(), cam.position.lerp(eye, k))
 	cam.fov = lerpf(cam.fov, fov, k)
 
 func _process(delta: float) -> void:
@@ -596,6 +651,18 @@ func _loupe(delta: float) -> void:
 				if c2.get("fake", false):
 					_caught_fake(item)
 		ui.refresh_inspect(item)
+
+## Points the look-around at a spot (the monitor), or back to the counter view with Vector3.ZERO.
+func _aim_at(p: Vector3) -> void:
+	if p == Vector3.ZERO:
+		look_yaw = 0.0
+		look_pitch = 0.0
+		return
+	var base := Basis.looking_at(SHOP_LOOK - SHOP_EYE)
+	var f := (p - SHOP_EYE).normalized()
+	var bf := -base.z
+	look_yaw = atan2(-f.x, -f.z) - atan2(-bf.x, -bf.z)
+	look_pitch = asin(clampf(f.y, -1.0, 1.0)) - asin(clampf(bf.y, -1.0, 1.0))
 
 ## Looking around from behind the counter: turn the view, within what a person turning their head and shoulders could see.
 func _look(dyaw: float, dpitch: float) -> void:
