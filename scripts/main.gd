@@ -95,7 +95,8 @@ func _next_visitor() -> void:
 func _arrived() -> void:
 	var info: Dictionary = visitor["info"]
 	figure.rotation = Vector3.ZERO                       ## face the counter
-	if not People.play(figure, "idle"):
+	if not People.play(figure, "idle") and not People.play(figure, "talk"):      ## no idle clip: a talking gesture that ends on a standing pose
+		People.stop(figure)
 		figure.set_meta("bob", true)
 	if visitor["type"] == "seller":
 		var kinds := Items.KINDS.keys()
@@ -109,7 +110,7 @@ func _arrived() -> void:
 		item["floor"] = maxi(3, roundi(belief * float(info["floor"])))
 		patience = int(info["patience"])
 		var hello: Array = info["hello"]
-		ui.say(info["name"], "%s\n\"I'd want $%d for this %s.\"" % [hello[rng.randi() % hello.size()], ask, String(item["name"]).to_lower()])
+		_say(info["name"], "%s\n\"I'd want $%d for this %s.\"" % [hello[rng.randi() % hello.size()], ask, String(item["name"]).to_lower()])
 		state = "talk"
 		ui.show_seller_actions()
 	else:
@@ -127,7 +128,7 @@ func _place_item() -> void:
 
 func _leave(text: String) -> void:
 	var info: Dictionary = visitor["info"]
-	ui.say(info["name"], text)
+	_say(info["name"], text)
 	ui.hide_actions()
 	state = "walking"
 	if item_node != null and visitor["type"] == "seller":
@@ -210,6 +211,12 @@ func _process(delta: float) -> void:
 	if figure != null and is_instance_valid(figure) and figure.has_meta("bob") and state in ["talk", "inspect", "haggle", "sell"]:
 		figure.position.y = absf(sin(Time.get_ticks_msec() * 0.002)) * 0.01          ## a little breathing bob
 
+## A customer's line in the speech panel; the figure gestures while saying it (when its model has a talking clip).
+func _say(who: String, text: String) -> void:
+	ui.say(who, text)
+	if figure != null and is_instance_valid(figure) and state != "walking":
+		People.play(figure, "talk")
+
 ## Where the loupe (the mouse) points on the object; resting on a hidden detail long enough reveals it.
 func _loupe(delta: float) -> void:
 	var mp := get_viewport().get_mouse_position()
@@ -286,7 +293,7 @@ func make_offer(offer: int) -> void:
 		if patience <= 0:
 			_leave(info["leave"])
 			return
-		ui.say(info["name"], info["insult"])
+		_say(info["name"], info["insult"])
 	elif offer >= floor_p and offer >= ask * 0.85:
 		_buy(offer)
 		return
@@ -299,7 +306,7 @@ func make_offer(offer: int) -> void:
 		if offer >= floor_p and patience <= 1:
 			_buy(offer)
 			return
-		ui.say(info["name"], String(info["counter"]) % ("$%d" % ask))
+		_say(info["name"], String(info["counter"]) % ("$%d" % ask))
 	ui.show_haggle(item, ask, patience)
 
 func accept_ask() -> void:
@@ -353,17 +360,17 @@ func _buyer_arrived(info: Dictionary) -> void:
 		if st["item"]["cat"] in wanted and (best.is_empty() or int(st["item"]["value"]) > int(best["item"]["value"])):
 			best = st
 	if best.is_empty():
-		ui.say(info["name"], "%s\nHm. Nothing here for me today." % info["hello"])
+		_say(info["name"], "%s\nHm. Nothing here for me today." % info["hello"])
 		get_tree().create_timer(2.5).timeout.connect(func() -> void: _leave("Maybe next time."))
 		return
 	visitor["deal"] = best
 	if best["item"]["fake"]:
-		ui.say(info["name"], "%s\nThat %s... %s" % [info["hello"], String(best["item"]["name"]).to_lower(), info["fake"]])
+		_say(info["name"], "%s\nThat %s... %s" % [info["hello"], String(best["item"]["name"]).to_lower(), info["fake"]])
 		get_tree().create_timer(3.5).timeout.connect(func() -> void: _leave("Good day."))
 		return
 	ask = roundi(float(best["item"]["value"]) * float(info["pays"]) * rng.randf_range(0.85, 1.05) / 5.0) * 5
 	patience = int(info["patience"])
-	ui.say(info["name"], "%s\n\"I'll give you $%d for the %s.\" (You paid $%d.)" % [info["hello"], ask, String(best["item"]["name"]).to_lower(), best["paid"]])
+	_say(info["name"], "%s\n\"I'll give you $%d for the %s.\" (You paid $%d.)" % [info["hello"], ask, String(best["item"]["name"]).to_lower(), best["paid"]])
 	ui.show_buyer_actions(ask)
 
 func sell_accept() -> void:
@@ -382,7 +389,7 @@ func sell_push() -> void:
 	patience -= 1
 	if rng.randf() < 0.55 and patience > 0:
 		ask = roundi(ask * 1.12 / 5.0) * 5
-		ui.say(info["name"], "\"All right. $%d, and not a cent more.\"" % ask)
+		_say(info["name"], "\"All right. $%d, and not a cent more.\"" % ask)
 		ui.show_buyer_actions(ask)
 	else:
 		_leave("Then I'll look elsewhere.")

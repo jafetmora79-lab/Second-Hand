@@ -102,6 +102,8 @@ static func figure(info: Dictionary, id: String) -> Node3D:
 
 ## Plays the figure's own animation whose name contains `what` ("walk", "idle", "talk", "wave"...), looping, if its model has one
 ## (Meshy rigged and animated models carry an AnimationPlayer). Returns false when there is none, so the stand-in bob is used.
+const GESTURE := 4.0
+
 static func play(figure: Node, what: String) -> bool:
 	if figure == null or not is_instance_valid(figure):
 		return false
@@ -112,5 +114,23 @@ static func play(figure: Node, what: String) -> bool:
 				var a := player.get_animation(anim_name)
 				a.loop_mode = Animation.LOOP_LINEAR if what in ["walk", "idle", "run"] else Animation.LOOP_NONE
 				player.play(anim_name, 0.25)
+				if a.loop_mode == Animation.LOOP_NONE and player.is_inside_tree():
+					## a gesture: after at most GESTURE seconds (Amos's angry talk runs 21 s) ease back to its first frame, a neutral stance,
+					## unless something else has started playing since
+					var n := StringName(anim_name)
+					var turn := player.get_meta("gesture", 0) as int + 1
+					player.set_meta("gesture", turn)
+					player.get_tree().create_timer(minf(a.length, GESTURE)).timeout.connect(func() -> void:
+						if is_instance_valid(player) and player.get_meta("gesture", 0) == turn and player.assigned_animation == n:
+							player.play(n, 0.5)
+							player.seek(0.0, true)
+							player.pause())
 				return true
 	return false
+
+## Stops whatever the figure is playing (a walk would otherwise keep looping on the spot).
+static func stop(figure: Node) -> void:
+	if figure == null or not is_instance_valid(figure):
+		return
+	for ap in figure.find_children("*", "AnimationPlayer", true, false):
+		(ap as AnimationPlayer).stop()

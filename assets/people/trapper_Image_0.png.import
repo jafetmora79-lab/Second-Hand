@@ -2,19 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dl6nn6pae23na"
-path="res://.godot/imported/collector_0.png-a809a6a45a34b553b5bde175390e840a.ctex"
+uid="uid://2wbo1etakjml"
+path="res://.godot/imported/trapper_Image_0.png-8ab8b163502c175633be0b3b2f682d41.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "3ccfa3c49b820de9c7708d000b98cee6"
 }
 
 [deps]
 
-source_file="res://assets/people/collector_0.png"
-dest_files=["res://.godot/imported/collector_0.png-a809a6a45a34b553b5bde175390e840a.ctex"]
+source_file="res://assets/people/trapper_Image_0.png"
+dest_files=["res://.godot/imported/trapper_Image_0.png-8ab8b163502c175633be0b3b2f682d41.ctex"]
 
 [params]
 
@@ -24,7 +21,7 @@ compress/lossy_quality=0.7
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
