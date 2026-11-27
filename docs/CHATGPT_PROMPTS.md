@@ -93,3 +93,26 @@ A single full-body stylized character as a standalone 3D game asset, isolated on
 ```
 A single full-body stylized character as a standalone 3D game asset, isolated on a plain white background, standing in a relaxed A-pose with arms held clear of the body, front three-quarter view: a cheerful woman in her forties who runs the ski lodge, short curly auburn hair, cream knitted Nordic-pattern sweater under an open red down vest, dark trousers, fleece-lined boots. Nothing hanging at the hips. Semi-realistic low-poly style with chunky shapes and a subtle pixel-art texture, warm muted palette. No props in hands, no scenery, no text.
 ```
+
+# Batch 4: two prompts, five images each (replaces batch 3)
+
+**Prompt A: five customers**
+```
+Make 5 separate square images, one at a time, all in exactly the same style. Each image: a single full-body stylized character as a standalone 3D game asset, isolated on a plain white background, standing in a relaxed A-pose with arms held clear of the body, front three-quarter view, nothing hanging at the hips, no props in hands, no scenery, no text. Style for all: semi-realistic low-poly with chunky shapes and a subtle pixel-art texture, warm muted palette, cosy snowy mountain town of the 1950s.
+1. A gentle elderly widow in her seventies, silver hair in a neat bun, small dark felt hat, long blue-grey wool coat with large buttons, knitted lavender shawl, black boots.
+2. An eager eleven-year-old boy, puffy teal winter jacket, orange knitted hat with a pom-pom, red mittens, snow boots, rosy cheeks and freckles.
+3. A lean, shifty drifter in his forties, stubble, wary eyes, dark flat cap, long worn charcoal overcoat with the collar up, grey scarf, fingerless gloves.
+4. A burly robber, face hidden by a dark knitted balaclava with only the eyes showing, dark green hooded parka with fur trim, heavy work gloves, big boots; menacing but storybook, not realistic.
+5. A dapper antiques collector in his sixties, neat grey beard, small round spectacles, brown tweed overcoat over a green waistcoat, burgundy bow tie, brown trilby hat.
+```
+
+**Prompt B: one customer and the shop furniture**
+```
+Make 5 separate square images, one at a time, all in exactly the same style. Each image: a single object as a standalone 3D game asset, isolated on a plain white background, three-quarter view from slightly above, the whole object in frame, no people unless stated, no scenery, no text. Style for all: semi-realistic low-poly with chunky shapes and a subtle pixel-art texture, warm muted palette, old log-cabin antique shop in a snowy mountain town.
+1. A full-body character in a relaxed A-pose, arms held clear of the body: a cheerful woman in her forties who runs the ski lodge, short curly auburn hair, cream Nordic-pattern sweater under an open red down vest, dark trousers, fleece-lined boots.
+2. A tall rustic square timber post, hand-hewn dark wood with visible adze marks and iron bolts, a simple carved bracket at the top, straight and plain so it can stand in a wall corner.
+3. A heavy rustic ceiling beam, a long hand-hewn dark timber with adze marks and two iron straps, seen from the side, straight and plain.
+4. An open wall shelving unit for an antique shop, dark stained wood, four deep shelves, carved side panels, empty shelves, straight front so it can stand against a wall.
+5. A glass display counter for an antique shop: a long wooden counter with a glass top and glass front panels, brass corners, a wooden base with drawers at the back; the inside shelves are EMPTY and the glass is clear.
+```
+The counter is asked for empty on purpose: Meshy can't make real see-through glass, so I'll give it real glass panes in the game and put the shop's actual Meshy objects (the ones you're selling) inside it.
