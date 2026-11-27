@@ -147,6 +147,78 @@ static func text_label(text: String, size: int = 16, col: Color = MUTED) -> Labe
 	l.add_theme_color_override("font_color", col)
 	return l
 
+# ---- the shop's period look: parchment cards, dark wood boxes with brass edges, tactile buttons ------------------------------------------
+
+const INK := Color(0.22, 0.14, 0.07)          ## writing on parchment
+const INK_SOFT := Color(0.38, 0.28, 0.17)
+const PARCH := Color(0.91, 0.84, 0.69)
+const BRASS := Color(0.74, 0.56, 0.27)
+const WOOD := Color(0.12, 0.085, 0.06, 0.95)
+const GREEN := Color(0.24, 0.45, 0.24)
+const RED := Color(0.55, 0.18, 0.13)
+
+## An appraisal-notebook page: warm parchment with a brass edge and a soft shadow.
+static func parchment_box(pad: float = 18.0) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = PARCH
+	sb.border_color = Color(0.45, 0.32, 0.16)
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(pad)
+	sb.shadow_color = Color(0, 0, 0, 0.45)
+	sb.shadow_size = 10
+	sb.shadow_offset = Vector2(0, 4)
+	return sb
+
+## Dark stained wood with a thin brass edge: the speech box and the plaques.
+static func wood_box(pad: float = 14.0, radius: int = 6) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = WOOD
+	sb.border_color = Color(BRASS, 0.85)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(radius)
+	sb.set_content_margin_all(pad)
+	sb.shadow_color = Color(0, 0, 0, 0.4)
+	sb.shadow_size = 8
+	return sb
+
+## A button in one of the shop's kinds: "go" (green), "stop" (red), "paper" (on parchment) or "wood" (the default, on dark).
+static func style_button(b: Button, kind: String = "wood", size: int = 18) -> void:
+	var base: Color
+	var text := CREAM
+	match kind:
+		"go":
+			base = GREEN
+		"stop":
+			base = RED
+		"paper":
+			base = Color(0.85, 0.77, 0.6)
+			text = INK
+		_:
+			base = Color(0.2, 0.14, 0.09)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = base
+	normal.border_color = base.darkened(0.45) if kind == "paper" else Color(BRASS, 0.9)
+	normal.set_border_width_all(2)
+	normal.border_width_bottom = 4                              ## a little depth, like a real button
+	normal.set_corner_radius_all(5)
+	normal.content_margin_left = 16
+	normal.content_margin_right = 16
+	normal.content_margin_top = 8
+	normal.content_margin_bottom = 8
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = base.lightened(0.12)
+	hover.border_color = AMBER
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = base.darkened(0.12)
+	pressed.border_width_bottom = 2
+	pressed.content_margin_top = 10
+	for st: Array in [["normal", normal], ["hover", hover], ["pressed", pressed], ["hover_pressed", pressed], ["focus", hover]]:
+		b.add_theme_stylebox_override(st[0], st[1])
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(c, text)
+	b.add_theme_font_size_override("font_size", px(size))
+
 # ---- vector icons, drawn on any CanvasItem (c = centre, s = size in px) ----------------------------------------------------------------
 
 static func icon(ci: CanvasItem, kind: String, c: Vector2, s: float, col: Color) -> void:
