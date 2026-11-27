@@ -21,6 +21,9 @@ var _offer_label: Label
 var _slider: HSlider
 var _patience: Label
 var _summary: Control = null
+var _feed: PanelContainer                  ## the porch camera: who is at the door
+var _feed_tex: TextureRect
+var _feed_note: Label
 var _title: Label
 var _sub: Label
 var _toast_t := 0.0
@@ -70,6 +73,7 @@ func _ready() -> void:
 	add_child(_actions)
 	_build_inspect()
 	_build_haggle()
+	_build_feed()
 	_title = UiStyle.title_label("", 64, UiStyle.CREAM)
 	_title.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -100,6 +104,55 @@ func _panel_right(width: float) -> PanelContainer:
 	p.visible = false
 	add_child(p)
 	return p
+
+func _build_feed() -> void:
+	_feed = PanelContainer.new()
+	_feed.add_theme_stylebox_override("panel", UiStyle.panel_box(UiStyle.PANEL, 10, UiStyle.EDGE, 14.0))
+	_feed.position = Vector2(24, 80)
+	_feed.visible = false
+	add_child(_feed)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	_feed.add_child(v)
+	var head := HBoxContainer.new()
+	var rec := UiStyle.text_label("● REC", 12, UiStyle.DANGER)
+	head.add_child(rec)
+	head.add_child(UiStyle.text_label("   PORCH CAMERA", 12, UiStyle.AMBER_DIM))
+	v.add_child(head)
+	_feed_tex = TextureRect.new()
+	_feed_tex.custom_minimum_size = Vector2(384, 288)
+	_feed_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_feed_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	v.add_child(_feed_tex)
+	_feed_note = UiStyle.text_label("", 15, UiStyle.CREAM)
+	_feed_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_feed_note.custom_minimum_size = Vector2(384, 0)
+	v.add_child(_feed_note)
+
+## Someone rang: the porch camera, what you can tell about them, and the two buttons.
+func show_door(title: String, look: String, note: String, tex: Texture2D) -> void:
+	_feed_tex.texture = tex
+	_feed_note.text = note
+	_feed.visible = true
+	say(title, look)
+	hide_actions()
+	_action("Buzz them in", func() -> void:
+		hide_actions()
+		_feed.visible = false
+		game.buzz_in())
+	_action("Not today", func() -> void:
+		hide_actions()
+		_feed.visible = false
+		game.turn_away())
+
+func show_robbery_actions() -> void:
+	hide_actions()
+	_action("Hand over the cash", func() -> void:
+		hide_actions()
+		game.rob_pay())
+	_action("Hit the alarm", func() -> void:
+		hide_actions()
+		game.rob_alarm())
 
 func _build_inspect() -> void:
 	_inspect = _panel_right(330)

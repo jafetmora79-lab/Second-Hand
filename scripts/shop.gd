@@ -9,6 +9,8 @@ const COUNTER_TOP := 0.96
 const MAT := Vector3(0.0, 0.985, -0.5)
 const CUSTOMER_SPOT := Vector3(0.0, 0.0, -1.45)
 const DOOR := Vector3(-2.2, 0.0, -3.9)
+const DOOR_W := 0.92                       ## the opening in the kit's doorway wall, at 3 m wide and 2.95 m tall
+const DOOR_H := 2.38
 
 static func _mat(c: Color, rough: float = 0.8, metal: float = 0.0) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -31,46 +33,31 @@ static func build(root: Node3D) -> Dictionary:
 	var shop := Node3D.new()
 	shop.name = "Shop"
 	root.add_child(shop)
-	var plank := _mat(Color(0.42, 0.29, 0.19))
 	var dark := _mat(Color(0.25, 0.17, 0.11))
-	var wall := _mat(Color(0.55, 0.42, 0.3))
 	var trim := _mat(Color(0.3, 0.2, 0.13))
-	# room: 6 m wide, 5 m deep, 2.9 m high
-	_box(shop, Vector3(0, -0.05, -1.5), Vector3(6.0, 0.1, 5.0), plank)
-	_box(shop, Vector3(0, 2.95, -1.5), Vector3(6.0, 0.1, 5.0), dark)
-	# the back wall, built round the window opening (x 0.3..2.5, y 0.9..2.4) so you can see out
-	_box(shop, Vector3(-1.35, 1.45, -4.0), Vector3(3.3, 2.9, 0.1), wall)
-	_box(shop, Vector3(2.75, 1.45, -4.0), Vector3(0.5, 2.9, 0.1), wall)
-	_box(shop, Vector3(1.4, 0.45, -4.0), Vector3(2.2, 0.9, 0.1), wall)
-	_box(shop, Vector3(1.4, 2.65, -4.0), Vector3(2.2, 0.5, 0.1), wall)
-	_box(shop, Vector3(-3.0, 1.45, -1.5), Vector3(0.1, 2.9, 5.0), wall)
-	_box(shop, Vector3(3.0, 1.45, -1.5), Vector3(0.1, 2.9, 5.0), wall)
-	_box(shop, Vector3(0, 1.45, 1.0), Vector3(6.0, 2.9, 0.1), wall)
-	for x in range(-5, 6):                                    ## floor board seams
-		_box(shop, Vector3(x * 0.55, 0.002, -1.5), Vector3(0.02, 0.004, 5.0), dark)
-	for y in [0.5, 1.0, 1.5, 2.0, 2.5]:                       ## wall plank seams (stopping at the window)
-		if y > 0.85 and y < 2.45:
-			_box(shop, Vector3(-1.35, y, -3.94), Vector3(3.3, 0.02, 0.01), trim)
-			_box(shop, Vector3(2.75, y, -3.94), Vector3(0.5, 0.02, 0.01), trim)
-		else:
-			_box(shop, Vector3(0, y, -3.94), Vector3(6.0, 0.02, 0.01), trim)
-	_box(shop, Vector3(0, 2.85, -3.93), Vector3(6.0, 0.12, 0.06), trim)
+	# room: 6 m wide, 5 m deep, 2.9 m high, built from Timberline's house kit (assets/kit)
+	for fx: float in [-1.5, 1.5]:                              ## plank floor
+		for fz: float in [-2.75, -0.25]:
+			_kit(shop, "HK_floor_finished", Vector3(fx, -0.06, fz), 0.0, Vector3(3.02, 0.06, 2.52))
+	_box(shop, Vector3(0, 2.95, -1.5), Vector3(6.0, 0.1, 5.0), dark)          ## ceiling boards
+	# the back wall: the doorway wall round the door, and the shop-window wall round the big window (opening about x 0.3..2.5, y 0.87..2.23)
+	_kit(shop, "HK_wall_door", Vector3(DOOR.x, -0.05, -4.0), 0.0, Vector3(3.0, 2.95, 0.2))
+	_kit(shop, "HK_wall_shop", Vector3(1.4, -0.05, -4.02), 0.0, Vector3(3.86, 2.95, 0.2))
+	var post := _box(shop, Vector3(-0.6, 1.425, -3.92), Vector3(0.3, 2.95, 0.32), _mat(Color(0.26, 0.17, 0.11)))   ## a corner post over the joint
+	# side walls and the wall behind you: log walls with plank wainscot
+	for side: float in [-1.0, 1.0]:
+		for z: float in [-2.75, -0.25]:
+			_kit(shop, "HK_wall_interior", Vector3(side * 3.0, -0.05, z), -side * PI * 0.5, Vector3(2.52, 2.95, 0.2))
+	for x: float in [-1.5, 1.5]:
+		_kit(shop, "HK_wall_interior", Vector3(x, -0.05, 1.0), PI, Vector3(3.02, 2.95, 0.2))
 	# beams
 	for z in [-3.0, -1.5, 0.0]:
 		_box(shop, Vector3(0, 2.8, z), Vector3(6.0, 0.16, 0.18), dark)
-	# the counter
-	_box(shop, Vector3(0, COUNTER_TOP * 0.5, COUNTER_Z), Vector3(2.6, COUNTER_TOP, 0.6), trim)
-	_box(shop, Vector3(0, COUNTER_TOP + 0.02, COUNTER_Z), Vector3(2.7, 0.04, 0.68), _mat(Color(0.5, 0.33, 0.2), 0.55))
+	# the counter (Timberline's shop counter) with the velvet mat on it
+	_kit(shop, "HK_counter", Vector3(0, 0, COUNTER_Z), 0.0, Vector3(2.7, COUNTER_TOP + 0.03, 0.68))
 	_box(shop, Vector3(0, COUNTER_TOP + 0.045, MAT.z), Vector3(0.62, 0.01, 0.42), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
-	# the cash register and a ledger
-	_box(shop, Vector3(0.95, COUNTER_TOP + 0.14, COUNTER_Z + 0.05), Vector3(0.36, 0.24, 0.3), _mat(Color(0.55, 0.42, 0.2), 0.35, 0.7))
-	_box(shop, Vector3(-0.9, COUNTER_TOP + 0.05, COUNTER_Z + 0.1), Vector3(0.32, 0.04, 0.24), _mat(Color(0.35, 0.12, 0.1)))
-	# the lamp over the mat: a brass arm and a green shade, and the light it throws
-	# (beside the mat on your right, low, so it never stands between you and the customer)
-	_box(shop, Vector3(0.62, COUNTER_TOP + 0.2, MAT.z + 0.05), Vector3(0.03, 0.4, 0.03), _mat(Color(0.75, 0.58, 0.28), 0.35, 0.8))
-	_box(shop, Vector3(0.5, COUNTER_TOP + 0.39, MAT.z + 0.05), Vector3(0.26, 0.03, 0.03), _mat(Color(0.75, 0.58, 0.28), 0.35, 0.8))
-	var shade := _box(shop, Vector3(0.38, COUNTER_TOP + 0.36, MAT.z + 0.05), Vector3(0.16, 0.07, 0.13), _mat(Color(0.15, 0.35, 0.22), 0.5))
-	shade.rotation.z = -0.35
+	# the warm light on the mat, from your right so nothing stands between you and the customer; a wall lantern by the window
+	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.75), 0.36, 0.0)
 	var lamp := SpotLight3D.new()
 	lamp.position = Vector3(0.3, COUNTER_TOP + 0.5, MAT.z + 0.05)
 	lamp.rotation = Vector3(-PI * 0.5, 0, 0.45)
@@ -86,58 +73,44 @@ static func build(root: Node3D) -> Dictionary:
 	room_light.light_energy = 1.0
 	room_light.light_color = Color(1.0, 0.82, 0.6)
 	shop.add_child(room_light)
-	var bulb_m := _mat(Color(1.0, 0.85, 0.6))
-	bulb_m.emission_enabled = true
-	bulb_m.emission = Color(1.0, 0.8, 0.55)
-	bulb_m.emission_energy_multiplier = 1.5
-	_box(shop, Vector3(0, 2.62, -1.8), Vector3(0.3, 0.2, 0.3), bulb_m)
-	# the window on the back wall: old glass you can see the town through (Outside builds the view), cold light coming in
+	_prop(shop, "shop/HK_lantern", Vector3(0, 2.2, -1.8), 0.4, 0.0)          ## hanging from the middle beam
+	# glass in the shop window: you see the town through it (Outside builds the view), cold light coming in
 	var glass := _mat(Color(0.8, 0.88, 0.95, 0.05), 0.05)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	glass.metallic_specular = 0.8
-	_box(shop, Vector3(1.4, 1.65, -3.97), Vector3(2.2, 1.5, 0.01), glass)
-	var wm := _mat(Color(0.7, 0.8, 0.95), 0.2)                ## the door's frosted pane
-	wm.emission_enabled = true
-	wm.emission = Color(0.55, 0.66, 0.85)
-	wm.emission_energy_multiplier = 0.9
-	# frost creeping in from the corners of the glass
-	var frost := _mat(Color(0.92, 0.95, 1.0, 0.55), 0.6)
-	frost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	for c: Vector2 in [Vector2(0.42, 0.95), Vector2(2.38, 0.95), Vector2(1.4, 0.93)]:
-		_box(shop, Vector3(c.x, c.y, -3.955), Vector3(0.24 if c.x != 1.4 else 2.2, 0.07, 0.005), frost)
-	for k in 3:
-		_box(shop, Vector3(1.4 + (k - 1) * 0.73, 1.65, -3.94), Vector3(0.05, 1.5, 0.04), trim)
-	_box(shop, Vector3(1.4, 1.65, -3.94), Vector3(2.2, 0.05, 0.04), trim)
-	_box(shop, Vector3(1.4, 0.88, -3.9), Vector3(2.3, 0.06, 0.16), trim)
-	for x in [0.3, 2.5]:                                       ## the frame round the opening
-		_box(shop, Vector3(x, 1.65, -3.94), Vector3(0.08, 1.58, 0.08), trim)
-	_box(shop, Vector3(1.4, 2.42, -3.94), Vector3(2.28, 0.08, 0.08), trim)
+	_box(shop, Vector3(1.4, 1.55, -4.05), Vector3(2.3, 1.45, 0.01), glass)
 	var cold := OmniLight3D.new()
 	cold.position = Vector3(1.4, 1.6, -3.3)
 	cold.omni_range = 3.5
 	cold.light_energy = 0.6
 	cold.light_color = Color(0.6, 0.72, 1.0)
 	shop.add_child(cold)
-	# the door with its bell
-	_box(shop, Vector3(DOOR.x, 1.05, -3.94), Vector3(1.0, 2.1, 0.06), _mat(Color(0.33, 0.2, 0.12)))
-	_box(shop, Vector3(DOOR.x, 1.5, -3.9), Vector3(0.5, 0.6, 0.02), wm)
-	_box(shop, Vector3(DOOR.x + 0.38, 1.0, -3.89), Vector3(0.05, 0.05, 0.05), _mat(Color(0.75, 0.58, 0.28), 0.35, 0.8))
+	# the electric door (Timberline's shop door): hinged on its left, swings in when you buzz someone through
+	var hinge := Node3D.new()
+	hinge.name = "Door"
+	hinge.position = Vector3(DOOR.x - DOOR_W * 0.5, 0, -4.0)
+	shop.add_child(hinge)
+	if _kit(hinge, "HK_door_shop", Vector3(DOOR_W * 0.5, 0, 0), 0.0, Vector3(DOOR_W, DOOR_H, 0.08)) == null:
+		_box(hinge, Vector3(DOOR_W * 0.5, DOOR_H * 0.5, 0), Vector3(DOOR_W, DOOR_H, 0.06), _mat(Color(0.33, 0.2, 0.12)))
+	var buzzer := _box(shop, Vector3(DOOR.x + DOOR_W * 0.5 + 0.2, 1.2, -3.88), Vector3(0.1, 0.16, 0.04), _mat(Color(0.2, 0.2, 0.22), 0.5, 0.5))   ## the lock box
+	var lock_led := _box(buzzer, Vector3(0, 0.05, 0.025), Vector3(0.025, 0.025, 0.01), _mat(Color(0.9, 0.1, 0.08)))
+	(lock_led.material_override as StandardMaterial3D).emission_enabled = true
+	(lock_led.material_override as StandardMaterial3D).emission = Color(1.0, 0.1, 0.05)
 	# shelves along the side walls, with stock
 	var shelves: Array = []
+	var decor: Array = []                                      ## the top shelves: the shop's own collection, not for sale
 	for side: float in [-1.0, 1.0]:
 		for k in 4:
 			var y := 0.55 + k * 0.5
 			_box(shop, Vector3(side * 2.78, y, -2.1), Vector3(0.4, 0.04, 2.4), trim)
 			for s in 4:
-				shelves.append(Vector3(side * 2.75, y + 0.03, -3.0 + s * 0.6))
+				(decor if k == 3 else shelves).append(Vector3(side * 2.75, y + 0.03, -3.0 + s * 0.6))
 		_box(shop, Vector3(side * 2.78, 1.3, -0.88), Vector3(0.42, 2.2, 0.06), trim)
 		_box(shop, Vector3(side * 2.78, 1.3, -3.32), Vector3(0.42, 2.2, 0.06), trim)
-	# a stove in the corner, glowing
-	_box(shop, Vector3(-2.4, 0.45, 0.4), Vector3(0.6, 0.9, 0.6), _mat(Color(0.1, 0.1, 0.11), 0.6, 0.4))
-	var fire := _box(shop, Vector3(-2.4, 0.4, 0.1), Vector3(0.3, 0.22, 0.02), _mat(Color(1.0, 0.5, 0.2)))
-	(fire.material_override as StandardMaterial3D).emission_enabled = true
-	(fire.material_override as StandardMaterial3D).emission = Color(1.0, 0.45, 0.15)
-	(fire.material_override as StandardMaterial3D).emission_energy_multiplier = 2.0
+	# a wood stove in the corner (Timberline's), glowing, a log pile by it
+	if _prop(shop, "shop/FURN_stove", Vector3(-2.4, 0, 0.4), 1.0, PI * 0.5) == null:
+		_box(shop, Vector3(-2.4, 0.45, 0.4), Vector3(0.6, 0.9, 0.6), _mat(Color(0.1, 0.1, 0.11), 0.6, 0.4))
+	_prop(shop, "shop/HK_log_pile", Vector3(-2.55, 0, -0.35), 0.45, 0.2)
 	var stove_light := OmniLight3D.new()
 	stove_light.position = Vector3(-2.3, 0.6, -0.1)
 	stove_light.omni_range = 2.5
@@ -156,4 +129,77 @@ static func build(root: Node3D) -> Dictionary:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	root.add_child(we)
-	return {"node": shop, "shelves": shelves, "lamp": lamp, "fire": fire}
+	_dress(shop)
+	return {"node": shop, "shelves": shelves, "decor": decor, "lamp": lamp, "door": hinge, "lock_led": lock_led}
+
+## Loads a model from assets/<file>.glb, scales it to `h` tall (or into `fit_box` when given), stands it on the floor at `pos`, turned `yaw`.
+## A Timberline house-kit piece (assets/kit), stretched to `size` (x along it, y up, z through it), bottom at pos.y, centred on pos.
+static func _kit(root: Node3D, piece: String, pos: Vector3, yaw: float, size: Vector3) -> Node3D:
+	var n := _prop(root, "kit/" + piece, pos, 0.0, yaw, 1, size)
+	_grade(n, KIT_GRADE)
+	return n
+
+## The kit's logs and planks are a loud orange; inside the lamp-lit shop they are toned down to aged wood (a multiply on each material's colour).
+const KIT_GRADE := Color(0.6, 0.57, 0.54)
+static var _graded := {}
+
+static func _grade(n: Node, tint: Color) -> void:
+	if n == null:
+		return
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		for i in m.mesh.get_surface_count():
+			var mat := m.get_active_material(i)
+			if not (mat is BaseMaterial3D):
+				continue
+			if not _graded.has(mat):                   ## one graded copy per kit material, shared by every piece that uses it
+				var g := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
+				g.albedo_color = g.albedo_color * tint
+				_graded[mat] = g
+			m.set_surface_override_material(i, _graded[mat])
+
+static func _prop(root: Node3D, file: String, pos: Vector3, h: float, yaw: float = 0.0, layer: int = 1, fit_box: Vector3 = Vector3.ZERO) -> Node3D:
+	var path := "res://assets/%s.glb" % file
+	if not ResourceLoader.exists(path):
+		return null
+	var m := (load(path) as PackedScene).instantiate() as Node3D
+	var box := AABB()
+	var first := true
+	for mi in m.find_children("*", "MeshInstance3D", true, false):
+		var inst := mi as MeshInstance3D
+		inst.layers = layer
+		var b := Models._rel(m, inst) * inst.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	var holder := Node3D.new()
+	holder.position = pos
+	holder.rotation.y = yaw
+	if fit_box != Vector3.ZERO:
+		holder.scale = Vector3(fit_box.x / maxf(box.size.x, 0.001), fit_box.y / maxf(box.size.y, 0.001), fit_box.z / maxf(box.size.z, 0.001))
+	else:
+		holder.scale = Vector3.ONE * h / maxf(box.size.y, 0.001)
+	m.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z)
+	holder.add_child(m)
+	root.add_child(holder)
+	return holder
+
+## Furnishes the shop with Timberline's own props: a stuffed deer, a barrel of odds and ends, an axe, the OPEN sign; outside, steps,
+## a mailbox and a lantern by the door.
+static func _dress(shop: Node3D) -> void:
+	_prop(shop, "shop/ANI_deer", Vector3(2.05, 0, -2.75), 1.25, -1.9)
+	_prop(shop, "shop/HK_barrel_crate", Vector3(2.15, 0, -1.25), 0.8, 0.4)
+	_prop(shop, "shop/TOOL_axe", Vector3(2.85, 0, -0.55), 0.85, 0.3)
+	_prop(shop, "shop/HK_open_sign", Vector3(1.0, 0.93, -3.92), 0.3, PI)          ## faces the street
+	# outside the door
+	_prop(shop, "shop/HK_steps", Vector3(DOOR.x, -0.25, -4.55), 0.3, PI, 2)
+	_prop(shop, "shop/HK_mailbox", Vector3(DOOR.x - 1.0, 0, -4.7), 1.1, PI, 2)
+	_prop(shop, "shop/HK_lantern", Vector3(DOOR.x + 0.75, 1.75, -4.12), 0.32, PI, 2)
+	var porch := OmniLight3D.new()                                   ## the porch lamp: lights whoever is waiting outside (outside layer only)
+	porch.position = Vector3(DOOR.x + 0.7, 1.9, -4.6)
+	porch.omni_range = 3.5
+	porch.light_energy = 1.2
+	porch.light_color = Color(1.0, 0.82, 0.55)
+	porch.light_cull_mask = 2
+	shop.add_child(porch)

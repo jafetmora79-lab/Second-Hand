@@ -2,7 +2,8 @@ extends Node3D
 ## Second Hand: the day in the shop.
 ## Customers come in one at a time. A seller puts their object on the mat: inspect it (drag to turn, scroll to zoom, hold the loupe over details to find
 ## clues), then make an offer and haggle, or send them away. A buyer looks over your shelves and makes you an offer for what they like.
-## Rent is due on day 7.
+## Rent is due on day 7. Everyone rings at the electric door first: look at them on the porch camera and buzz them in, or don't.
+## The shop remembers who brought fakes and who robbed it, and says so on the camera next time.
 
 const START_MONEY := 500
 const RENT := 600
@@ -10,6 +11,9 @@ const RENT_DAY := 7
 const LOUPE_DWELL := 0.45                  ## seconds the loupe must rest on a detail to read it
 const LOUPE_REACH := 0.032                 ## metres from a clue's spot that still counts
 const ZOOM_READ := 0.62                    ## the camera must be at least this close to read a detail
+const PORCH := Vector3(-2.2, 0, -5.6)      ## where callers wait, outside the door
+const STREET := Vector3(2.0, 0, -7.6)      ## where they come from and go back to, along the lane
+const INSIDE := Vector3(-2.2, 0, -3.3)     ## just inside the door
 
 var rng := RandomNumberGenerator.new()
 var cam: Camera3D
@@ -37,11 +41,15 @@ const REST_H := 0.15                       ## the object's centre above the mat 
 const HELD_H := 0.3                        ## ...and while you hold it up to look: clear of the mat however you turn it
 var day_log := {"bought": 0, "sold": 0, "spent": 0, "earned": 0}
 var shelf_slots: Array = []
+var rep := {}                              ## what the shop remembers about each caller: {"visits", "fakes", "robbed"}
+var feed: SubViewport                      ## the porch camera
 
 func _ready() -> void:
 	rng.seed = 2026
 	shop = Shop.build(self)
 	shelf_slots = shop["shelves"]
+	_build_feed()
+	_decorate()
 	cam = Camera3D.new()
 	cam.fov = 60.0
 	cam.near = 0.02
@@ -65,13 +73,17 @@ func _start_day() -> void:
 	queue.clear()
 	var sellers := ["trapper", "widow", "kid", "collector", "drifter"]
 	sellers.shuffle()
-	for i in mini(2 + mini(day, 3), sellers.size()):
-		queue.append({"type": "seller", "id": sellers[i]})
+	var n_sellers := mini(2 + mini(day, 3), sellers.size())
+	var legit := rng.randi() % n_sellers                ## one seller a day always brings the real thing, so the rent can be made
+	for i in n_sellers:
+		queue.append({"type": "seller", "id": sellers[i], "legit": i == legit})
 	if day >= 1:
 		var b: String = ["collector_b", "decorator"][day % 2]
 		queue.insert(mini(2, queue.size()), {"type": "buyer", "id": b})
 		if day >= 3:
 			queue.append({"type": "buyer", "id": ["collector_b", "decorator"][(day + 1) % 2]})
+	if day >= 2 and rng.randf() < 0.55:                 ## from day 2, trouble: a masked man, or the stranger turned bad
+		queue.insert(rng.randi_range(1, queue.size()), {"type": "robber", "id": "robber" if rng.randf() < 0.6 else "drifter"})
 	ui.show_day_title("Day %d" % day, "Rent of $%d due on day %d" % [RENT, RENT_DAY] if day < RENT_DAY else "Rent is due tonight: $%d" % RENT)
 	state = "idle"
 	get_tree().create_timer(2.2).timeout.connect(_next_visitor)
@@ -81,20 +93,127 @@ func _next_visitor() -> void:
 		_end_day()
 		return
 	visitor = queue.pop_front()
-	var info: Dictionary = People.FOLK[visitor["id"]] if visitor["type"] == "seller" else People.BUYERS[visitor["id"]]
+	var info: Dictionary
+	match String(visitor["type"]):
+		"seller":
+			info = People.FOLK[visitor["id"]]
+		"buyer":
+			info = People.BUYERS[visitor["id"]]
+		_:
+			info = People.ROBBERS["robber"].duplicate()
+			if visitor["id"] != "robber":                ## someone you know, come to rob you
+				info.merge(People.FOLK[visitor["id"]], false)
+				info["name"] = People.FOLK[visitor["id"]]["name"]
 	visitor["info"] = info
 	figure = People.figure(info, visitor["id"])
-	figure.position = Shop.DOOR + Vector3(0, 0, 0.3)
+	figure.position = STREET
 	add_child(figure)
-	ui.bell()
+	People.set_layers(figure, 2)                         ## outside: lit by the cold daylight and the porch lamp
 	state = "walking"
-	figure.look_at(Vector3(Shop.DOOR.x, 0, -2.6) + Vector3(0, 0, 0.01), Vector3.UP, true)
+	figure.look_at(PORCH + Vector3(0, 0, 0.001), Vector3.UP, true)
 	People.play(figure, "walk")
 	var tw := create_tween()
-	tw.tween_property(figure, "position", Vector3(Shop.DOOR.x, 0, -2.6), 0.9)
-	tw.tween_callback(func() -> void: figure.look_at(Shop.CUSTOMER_SPOT + Vector3(0, 0, 0.01), Vector3.UP, true))
-	tw.tween_property(figure, "position", Shop.CUSTOMER_SPOT, 1.4).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(figure, "position", PORCH, 2.4)
+	tw.tween_callback(_at_door)
+
+## They ring. The porch camera comes on and shows them, with what the shop remembers about them.
+func _at_door() -> void:
+	figure.look_at(PORCH + Vector3(0, 0, 1.0), Vector3.UP, true)
+	if not People.play(figure, "idle"):
+		People.stop(figure)
+	ui.bell()
+	state = "at_door"
+	feed.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	var id: String = visitor["id"]
+	var r: Dictionary = rep.get(id, {})
+	var title := String(visitor["info"]["name"]) if int(r.get("visits", 0)) > 0 else "Someone at the door"
+	ui.show_door(title, "*Bzzz.*  " + String(People.DOOR_LOOK.get(id, "")), _memory(id), feed.get_texture())
+
+## What the shop remembers about a caller, for the camera.
+func _memory(id: String) -> String:
+	var r: Dictionary = rep.get(id, {})
+	if r.is_empty():
+		return "Never been in before."
+	var lines: Array = ["Been in %d time%s." % [r["visits"], "" if r["visits"] == 1 else "s"]]
+	if r["fakes"] > 0:
+		lines.append("Brought you %d fake%s." % [r["fakes"], "" if r["fakes"] == 1 else "s"])
+	if r["robbed"] > 0:
+		lines.append("ROBBED THE SHOP.")
+	return "  ".join(lines)
+
+func _remember(id: String, what: String) -> void:
+	if not rep.has(id):
+		rep[id] = {"visits": 0, "fakes": 0, "robbed": 0}
+	rep[id][what] += 1
+
+func buzz_in() -> void:
+	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_remember(visitor["id"], "visits")
+	state = "walking"
+	_door(true)
+	var f := figure
+	People.play(f, "walk")
+	f.look_at(INSIDE + Vector3(0, 0, 0.001), Vector3.UP, true)
+	var tw := create_tween()
+	tw.tween_interval(0.5)
+	tw.tween_property(f, "position", Vector3(PORCH.x, 0, -4.0), 0.6)
+	tw.tween_callback(func() -> void: People.set_layers(f, 1))
+	tw.tween_property(f, "position", INSIDE, 0.6)
+	tw.tween_callback(func() -> void:
+		_door(false)
+		f.look_at(Shop.CUSTOMER_SPOT + Vector3(0, 0, 0.01), Vector3.UP, true))
+	tw.tween_property(f, "position", Shop.CUSTOMER_SPOT, 1.8).set_trans(Tween.TRANS_SINE)
 	tw.tween_callback(_arrived)
+
+func turn_away() -> void:
+	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	ui.say("", "You leave the door locked. After a moment they turn and trudge off up the lane.")
+	state = "walking"
+	var f := figure
+	People.play(f, "walk")
+	f.look_at(STREET + Vector3(0, 0, 0.001), Vector3.UP, true)
+	var tw := create_tween()
+	tw.tween_interval(0.8)
+	tw.tween_property(f, "position", STREET, 2.4)
+	tw.tween_callback(func() -> void:
+		f.queue_free()
+		_next_visitor())
+
+## Swings the electric door open (in toward the shop) or shut; the lock light goes green while it is open.
+func _door(open: bool) -> void:
+	var hinge: Node3D = shop["door"]
+	create_tween().tween_property(hinge, "rotation:y", -1.75 if open else 0.0, 0.7).set_trans(Tween.TRANS_SINE)
+	var led := shop["lock_led"] as MeshInstance3D
+	var m := led.material_override as StandardMaterial3D
+	m.albedo_color = Color(0.1, 0.9, 0.2) if open else Color(0.9, 0.1, 0.08)
+	m.emission = m.albedo_color
+	if open:
+		ui.bell()
+
+## The porch camera: a camera over the door looking down at the step, drawn into a small picture for the UI.
+func _build_feed() -> void:
+	feed = SubViewport.new()
+	feed.size = Vector2i(384, 288)
+	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(feed)
+	var c := Camera3D.new()
+	c.fov = 62.0
+	var eye := Vector3(PORCH.x + 0.6, 2.3, -4.2)
+	c.transform = Transform3D(Basis.looking_at(PORCH + Vector3(0.0, 1.0, 0) - eye), eye)
+	feed.add_child(c)
+	c.current = true
+
+## The shop's own collection on the top shelves, not for sale: one of each kind of object, the real thing.
+func _decorate() -> void:
+	var kinds := Items.KINDS.keys()
+	var spots: Array = shop["decor"]
+	for i in spots.size():
+		var n := Models.build({"kind": kinds[i % kinds.size()], "clues": []})
+		var spot: Vector3 = spots[i]
+		n.position = spot + Vector3(0, 0.1, 0)
+		n.scale = Vector3.ONE * 0.75
+		n.rotation.y = (PI * 0.5) * (1.0 if spot.x < 0.0 else -1.0)
+		add_child(n)
 
 func _arrived() -> void:
 	var info: Dictionary = visitor["info"]
@@ -102,10 +221,15 @@ func _arrived() -> void:
 	if not People.play(figure, "idle") and not People.play(figure, "talk"):      ## no idle clip: a talking gesture that ends on a standing pose
 		People.stop(figure)
 		figure.set_meta("bob", true)
+	if visitor["type"] == "robber":
+		_robbery(info)
+		return
 	if visitor["type"] == "seller":
 		var kinds := Items.KINDS.keys()
 		var kind: String = kinds[rng.randi() % kinds.size()]
-		var fake_chance := 0.45 if visitor["id"] == "drifter" else (0.25 if visitor["id"] == "collector" else 0.12)
+		var fake_chance := 0.55 if visitor["id"] == "drifter" else (0.3 if visitor["id"] == "collector" else 0.18)
+		if visitor.get("legit", false):
+			fake_chance = 0.0
 		item = Items.make(kind, rng, fake_chance)
 		item["seller"] = visitor["id"]
 		_place_item()
@@ -132,7 +256,7 @@ func _place_item() -> void:
 	pivot.scale = Vector3.ONE * 0.01
 	create_tween().tween_property(pivot, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
-func _leave(text: String) -> void:
+func _leave(text: String, hurry: bool = false) -> void:
 	var info: Dictionary = visitor["info"]
 	_say(info["name"], text)
 	ui.hide_actions()
@@ -143,18 +267,65 @@ func _leave(text: String) -> void:
 		create_tween().tween_property(pivot, "scale", Vector3.ONE * 0.01, 0.25).finished.connect(n.queue_free)
 	_shop_view()
 	var f := figure
+	var k := 0.5 if hurry else 1.0
 	var tw := create_tween()
-	tw.tween_interval(1.2)
+	tw.tween_interval(1.2 * k)
 	tw.tween_callback(func() -> void:
-		f.look_at(Vector3(Shop.DOOR.x, 0, -2.6), Vector3.UP, true)
-		People.play(f, "walk"))
-	tw.tween_property(f, "position", Vector3(Shop.DOOR.x, 0, -2.6), 1.3)
-	tw.tween_property(f, "position", Shop.DOOR + Vector3(0, 0, -0.2), 0.8)
+		f.look_at(INSIDE + Vector3(0, 0, 0.001), Vector3.UP, true)
+		People.play(f, "run" if hurry else "walk"))
+	tw.tween_property(f, "position", INSIDE, 1.8 * k)
+	tw.tween_callback(func() -> void: _door(true))
+	tw.tween_interval(0.4 * k)
+	tw.tween_callback(func() -> void: People.set_layers(f, 2))
+	tw.tween_property(f, "position", PORCH, 0.9 * k)
+	tw.tween_callback(func() -> void:
+		_door(false)
+		f.look_at(STREET + Vector3(0, 0, 0.001), Vector3.UP, true))
+	tw.tween_property(f, "position", STREET, 2.2 * k)
 	tw.tween_callback(func() -> void:
 		f.queue_free()
-		ui.bell()
 		item = {}
-		get_tree().create_timer(1.0).timeout.connect(_next_visitor))
+		get_tree().create_timer(0.8).timeout.connect(_next_visitor))
+
+## A fake is found out (by your loupe, or by a buyer who won't touch it): whoever brought it in is remembered for it, once per object.
+func _caught_fake(it: Dictionary) -> void:
+	if it.get("caught", false) or not it.has("seller"):
+		return
+	it["caught"] = true
+	_remember(String(it["seller"]), "fakes")
+
+# ---- robbers -----------------------------------------------------------------------------------------------------------------------
+
+func _robbery(info: Dictionary) -> void:
+	state = "robbery"
+	var lines: Array = info["demand"]
+	_say(info["name"], lines[rng.randi() % lines.size()])
+	ui.show_robbery_actions()
+
+## Give him what is in the till: he takes most of it and goes. Safe, and expensive.
+func rob_pay() -> void:
+	var take := mini(money, maxi(60, roundi(money * 0.45 / 5.0) * 5))
+	money -= take
+	ui.cash(-take)
+	day_log["spent"] += take
+	_remember(visitor["id"], "robbed")
+	_leave("He stuffs $%d in his coat and is gone." % take, true)
+
+## The alarm under the counter: usually he runs empty-handed, sometimes he grabs the best thing off a shelf first.
+func rob_alarm() -> void:
+	_remember(visitor["id"], "robbed")
+	var info: Dictionary = visitor["info"]
+	if rng.randf() < 0.6 or stock.is_empty():
+		_leave(String(info["flee"]), true)
+		return
+	var best: Dictionary = stock[0]
+	for st: Dictionary in stock:
+		if int(st["item"]["value"]) > int(best["item"]["value"]):
+			best = st
+	if best["node"] != null and is_instance_valid(best["node"]):
+		(best["node"] as Node3D).queue_free()
+	stock.erase(best)
+	_leave("%s (The %s.)" % [String(info["grab"]), String(best["item"]["name"]).to_lower()], true)
 
 func _end_day() -> void:
 	state = "day_end"
@@ -290,6 +461,8 @@ func _loupe(delta: float) -> void:
 		for c2: Dictionary in item["clues"]:
 			if c2["id"] == best:
 				ui.found_clue(c2)
+				if c2.get("fake", false):
+					_caught_fake(item)
 		ui.refresh_inspect(item)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -414,6 +587,7 @@ func _buyer_arrived(info: Dictionary) -> void:
 		return
 	visitor["deal"] = best
 	if best["item"]["fake"]:
+		_caught_fake(best["item"])
 		_say(info["name"], "%s\nThat %s... %s" % [info["hello"], String(best["item"]["name"]).to_lower(), info["fake"]])
 		get_tree().create_timer(3.5).timeout.connect(func() -> void: _leave("Good day."))
 		return

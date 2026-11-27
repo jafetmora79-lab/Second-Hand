@@ -50,6 +50,7 @@ static func build(item: Dictionary) -> Node3D:
 		var model := (load(path) as PackedScene).instantiate() as Node3D
 		root.add_child(model)
 		_fit(model)
+		_tint(model, item.get("tint", Color.WHITE))
 		_aim_clues(root, model, item["clues"])
 	else:
 		_stand_in(root, String(item["kind"]))
@@ -117,6 +118,21 @@ static func _aim_clues(root: Node3D, model: Node3D, clues: Array) -> void:
 					hit = r
 		c["pos"] = hit if hit != Vector3.INF else c0 + n * n.abs().dot(half)
 		c["normal"] = n
+
+## Colours a copy differently from the real piece (its own copies of the materials, so other objects of the kind are untouched).
+static func _tint(model: Node3D, tint: Color) -> void:
+	if tint == Color.WHITE:
+		return
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		for s in m.mesh.get_surface_count():
+			var mat := m.get_active_material(s)
+			if mat is BaseMaterial3D:
+				var t := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
+				t.albedo_color = t.albedo_color * tint
+				m.set_surface_override_material(s, t)
 
 ## Scales and centres a Meshy model so its largest side is SIZE and it sits centred on the origin.
 static func _fit(model: Node3D) -> void:

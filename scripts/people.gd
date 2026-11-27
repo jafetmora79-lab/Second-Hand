@@ -28,6 +28,25 @@ const FOLK := {
 		"accept": "Pleasure.", "counter": "%s. Last offer.", "leave": "Your loss.", "insult": "Funny guy."},
 }
 
+## People who come to take, not to trade. They ring like anyone else; let them in and they go for the till.
+const ROBBERS := {
+	"robber": {"name": "A man in a balaclava", "coat": Color(0.2, 0.28, 0.2), "hat": Color(0.08, 0.08, 0.08), "skin": Color(0.8, 0.64, 0.52), "height": 1.85,
+		"demand": ["Hands where I can see them. Open the till.", "Nice and quiet now. All the cash, in the bag."],
+		"flee": "He bolts for the door as the alarm screams.", "grab": "He snatches something off the shelf on his way out!"},
+}
+
+## Lines a customer's face says at the door, on the porch camera, before you decide to buzz them in.
+const DOOR_LOOK := {
+	"trapper": "Stamping snow off his boots, a bundle under his arm.",
+	"collector": "Checking her watch. Impatient.",
+	"widow": "Holding something wrapped in a cloth, carefully.",
+	"kid": "Hopping from foot to foot in the cold.",
+	"drifter": "Collar up. Keeps glancing up the street.",
+	"robber": "Face covered. Hands in his pockets. Doesn't look at the camera.",
+	"collector_b": "Tweed coat, a leather notebook. Peering in at the window.",
+	"decorator": "Rubbing her hands, a list in her pocket.",
+}
+
 const BUYERS := {
 	"collector_b": {"name": "Mr. Pell, a collector", "coat": Color(0.25, 0.3, 0.26), "hat": Color(0.3, 0.22, 0.15), "skin": Color(0.84, 0.7, 0.6), "height": 1.75,
 		"want": ["instruments", "watches"], "pays": 1.35, "patience": 3,
@@ -134,3 +153,10 @@ static func stop(figure: Node) -> void:
 		return
 	for ap in figure.find_children("*", "AnimationPlayer", true, false):
 		(ap as AnimationPlayer).stop()
+
+## Moves a figure onto other render layers: 2 while it waits outside (lit by the cold sun and the porch lamp), 1 indoors.
+static func set_layers(figure: Node, mask: int) -> void:
+	if figure == null or not is_instance_valid(figure):
+		return
+	for mi in figure.find_children("*", "VisualInstance3D", true, false):
+		(mi as VisualInstance3D).layers = mask
