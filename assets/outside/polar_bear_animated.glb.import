@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://sp140u8i3vry"
-path="res://.godot/imported/ANI_deer.glb-54ba45dd37c3ce2f2107f0bdbbea003c.scn"
+uid="uid://d3e67y0bqygug"
+path="res://.godot/imported/polar_bear_animated.glb-cd074979b1bc8a45c8e680fd6be69c85.scn"
 
 [deps]
 
-source_file="res://assets/shop/ANI_deer.glb"
-dest_files=["res://.godot/imported/ANI_deer.glb-54ba45dd37c3ce2f2107f0bdbbea003c.scn"]
+source_file="res://assets/outside/polar_bear_animated.glb"
+dest_files=["res://.godot/imported/polar_bear_animated.glb-cd074979b1bc8a45c8e680fd6be69c85.scn"]
 
 [params]
 

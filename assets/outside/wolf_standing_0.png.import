@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cwds8pwb667eh"
-path="res://.godot/imported/ANI_deer_0.png-e8208096fd06bb8dbca8035184ad8747.ctex"
+uid="uid://bx8kkqqcgwmf1"
+path="res://.godot/imported/wolf_standing_0.png-2191d9ffb7fa83a8b00762355c24b239.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "a71fcf5a4833300520403f71193589e3"
+"md5": "6bd5d6aa56a99083956ba33d74f93744"
 }
 
 [deps]
 
-source_file="res://assets/shop/ANI_deer_0.png"
-dest_files=["res://.godot/imported/ANI_deer_0.png-e8208096fd06bb8dbca8035184ad8747.ctex"]
+source_file="res://assets/outside/wolf_standing_0.png"
+dest_files=["res://.godot/imported/wolf_standing_0.png-2191d9ffb7fa83a8b00762355c24b239.ctex"]
 
 [params]
 

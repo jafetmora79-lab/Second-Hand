@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://8itkt35tn37n"
-path="res://.godot/imported/HK_open_sign.glb-4a764331b58639ef2f1c7c1e34250bd5.scn"
+uid="uid://bqh2q5u3d70f3"
+path="res://.godot/imported/wolf_standing.glb-88cfc70918c69f154fd7bc3cdf4b436f.scn"
 
 [deps]
 
-source_file="res://assets/shop/HK_open_sign.glb"
-dest_files=["res://.godot/imported/HK_open_sign.glb-4a764331b58639ef2f1c7c1e34250bd5.scn"]
+source_file="res://assets/outside/wolf_standing.glb"
+dest_files=["res://.godot/imported/wolf_standing.glb-88cfc70918c69f154fd7bc3cdf4b436f.scn"]
 
 [params]
 

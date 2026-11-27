@@ -43,6 +43,8 @@ var day_log := {"bought": 0, "sold": 0, "spent": 0, "earned": 0}
 var shelf_slots: Array = []
 var rep := {}                              ## what the shop remembers about each caller: {"visits", "fakes", "robbed"}
 var feed: SubViewport                      ## the porch camera
+var day_total := 1                         ## callers today, for the time of day: morning at the first, night after the last
+var day_time := 0.0                        ## 0 morning .. 1 night, shown through the window
 
 func _ready() -> void:
 	rng.seed = 2026
@@ -50,6 +52,7 @@ func _ready() -> void:
 	shelf_slots = shop["shelves"]
 	_build_feed()
 	_decorate()
+	_animal_loop()
 	cam = Camera3D.new()
 	cam.fov = 60.0
 	cam.near = 0.02
@@ -86,12 +89,16 @@ func _start_day() -> void:
 		queue.insert(rng.randi_range(1, queue.size()), {"type": "robber", "id": "robber" if rng.randf() < 0.6 else "drifter"})
 	ui.show_day_title("Day %d" % day, "Rent of $%d due on day %d" % [RENT, RENT_DAY] if day < RENT_DAY else "Rent is due tonight: $%d" % RENT)
 	state = "idle"
+	day_total = maxi(1, queue.size())
+	_set_time(0.0, 0.1)
 	get_tree().create_timer(2.2).timeout.connect(_next_visitor)
 
 func _next_visitor() -> void:
 	if queue.is_empty():
-		_end_day()
+		_set_time(1.0, 3.0)
+		get_tree().create_timer(3.2).timeout.connect(_end_day)
 		return
+	_set_time(0.85 * float(day_total - queue.size()) / float(day_total), 4.0)      ## the day wears on with each caller; dusk by the last
 	visitor = queue.pop_front()
 	var info: Dictionary
 	match String(visitor["type"]):
@@ -115,6 +122,20 @@ func _next_visitor() -> void:
 	var tw := create_tween()
 	tw.tween_property(figure, "position", PORCH, 2.4)
 	tw.tween_callback(_at_door)
+
+## Moves the light outside toward a time of day (0 morning, 1/3 midday, 2/3 sunset, 1 night) over `secs`.
+func _set_time(t: float, secs: float) -> void:
+	var tw := create_tween()
+	tw.tween_method(func(v: float) -> void:
+		day_time = v
+		Outside.set_time(v), day_time, t, secs).set_trans(Tween.TRANS_SINE)
+
+## Now and then an animal wanders past the window (a rabbit, a wolf, a bear far off, a raven overhead).
+func _animal_loop() -> void:
+	while is_inside_tree():
+		await get_tree().create_timer(rng.randf_range(12.0, 30.0)).timeout
+		if state != "inspect" and state != "haggle":
+			Outside.spawn_animal(self, rng)
 
 ## They ring. The porch camera comes on and shows them, with what the shop remembers about them.
 func _at_door() -> void:

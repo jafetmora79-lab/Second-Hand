@@ -39,7 +39,23 @@ static func build(root: Node3D) -> Dictionary:
 	for fx: float in [-1.5, 1.5]:                              ## plank floor
 		for fz: float in [-2.75, -0.25]:
 			_kit(shop, "HK_floor_finished", Vector3(fx, -0.06, fz), 0.0, Vector3(3.02, 0.06, 2.52))
-	_box(shop, Vector3(0, 2.95, -1.5), Vector3(6.0, 0.1, 5.0), dark)          ## ceiling boards
+	for fx: float in [-1.5, 1.5]:                              ## plank ceiling: the kit's floorboards, face down
+		for fz: float in [-2.75, -0.25]:
+			var c := _kit(shop, "HK_floor_finished", Vector3(fx, 2.96, fz), 0.0, Vector3(3.02, 0.06, 2.52))
+			if c != null:
+				c.rotation.x = PI
+	_box(shop, Vector3(0, 3.0, -1.5), Vector3(6.4, 0.06, 5.4), dark)          ## the roof boards above it, so no sky shows between planks
+	# behind every wall, a dark backing: the rounded logs and the joints between kit pieces never show daylight
+	var back := _mat(Color(0.16, 0.11, 0.08))
+	_box(shop, Vector3(-3.16, 1.45, -1.5), Vector3(0.06, 3.0, 5.4), back)
+	_box(shop, Vector3(3.16, 1.45, -1.5), Vector3(0.06, 3.0, 5.4), back)
+	_box(shop, Vector3(0, 1.45, 1.16), Vector3(6.4, 3.0, 0.06), back)
+	_box(shop, Vector3(-0.72, 1.45, -4.16), Vector3(2.04, 3.0, 0.06), back)                     ## back wall, round the door and the window
+	_box(shop, Vector3(-2.91, 1.45, -4.16), Vector3(0.5, 3.0, 0.06), back)
+	_box(shop, Vector3(DOOR.x, 2.7, -4.16), Vector3(DOOR_W + 0.1, 0.6, 0.06), back)
+	_box(shop, Vector3(2.83, 1.45, -4.16), Vector3(0.66, 3.0, 0.06), back)
+	_box(shop, Vector3(1.4, 0.43, -4.16), Vector3(2.2, 0.86, 0.06), back)
+	_box(shop, Vector3(1.4, 2.62, -4.16), Vector3(2.2, 0.77, 0.06), back)
 	# the back wall: the doorway wall round the door, and the shop-window wall round the big window (opening about x 0.3..2.5, y 0.87..2.23)
 	_kit(shop, "HK_wall_door", Vector3(DOOR.x, -0.05, -4.0), 0.0, Vector3(3.0, 2.95, 0.2))
 	_kit(shop, "HK_wall_shop", Vector3(1.4, -0.05, -4.02), 0.0, Vector3(3.86, 2.95, 0.2))
@@ -216,13 +232,11 @@ static func _prop(root: Node3D, file: String, pos: Vector3, h: float, yaw: float
 	root.add_child(holder)
 	return holder
 
-## Furnishes the shop with Timberline's own props: a stuffed deer, a barrel of odds and ends, an axe, the OPEN sign; outside, steps,
+## Furnishes the shop with Timberline's own props: a barrel of odds and ends, an axe; outside, steps,
 ## a mailbox and a lantern by the door.
 static func _dress(shop: Node3D) -> void:
-	_prop(shop, "shop/ANI_deer", Vector3(2.05, 0, -2.75), 1.25, -1.9)
 	_prop(shop, "shop/HK_barrel_crate", Vector3(2.15, 0, -1.25), 0.8, 0.4)
 	_prop(shop, "shop/TOOL_axe", Vector3(2.85, 0, -0.55), 0.85, 0.3)
-	_prop(shop, "shop/HK_open_sign", Vector3(1.0, 0.93, -3.92), 0.3, PI)          ## faces the street
 	# outside the door
 	_prop(shop, "shop/HK_steps", Vector3(DOOR.x, -0.25, -4.55), 0.3, PI, 2)
 	_prop(shop, "shop/HK_mailbox", Vector3(DOOR.x - 1.0, 0, -4.7), 1.1, PI, 2)
