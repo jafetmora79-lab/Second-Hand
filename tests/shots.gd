@@ -17,7 +17,7 @@ func run() -> void:
 	g.zoom = 0.5
 	await wait(1.0)
 	await snap("inspect")
-	g.pivot.rotate_x(PI)
+	g.turn_item("flip")
 	g.zoom = 0.4
 	await wait(1.0)
 	g.item["found"].append(g.item["clues"][0]["id"])

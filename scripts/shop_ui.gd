@@ -107,10 +107,23 @@ func _build_inspect() -> void:
 	v.add_theme_constant_override("separation", 8)
 	_inspect.add_child(v)
 	v.add_child(UiStyle.title_label("Inspect", 28))
-	var how := UiStyle.text_label("Drag to turn it.  Scroll to look closer.\nRest the loupe on anything that catches your eye.", 14, UiStyle.MUTED)
+	var how := UiStyle.text_label("Drag to turn it, or use the buttons (keys A D W S, F to turn over, R to reset). Scroll to look closer. Rest the loupe on anything that catches your eye.", 14, UiStyle.MUTED)
 	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	how.custom_minimum_size = Vector2(290, 0)
 	v.add_child(how)
+	var grid := GridContainer.new()                     ## turn it without dragging: quarter turns, turn it over, put it back as it was
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	for b: Array in [["Tip up", "tip_up"], ["Turn over", "flip"], ["Tip down", "tip_down"], ["Turn left", "left"], ["Reset", "reset"], ["Turn right", "right"]]:
+		var btn := Button.new()
+		btn.text = b[0]
+		btn.custom_minimum_size = Vector2(94, 34)
+		btn.add_theme_font_size_override("font_size", 14)
+		var how_turn: String = b[1]
+		btn.pressed.connect(func() -> void: game.turn_item(how_turn))
+		grid.add_child(btn)
+	v.add_child(grid)
 	v.add_child(UiStyle.text_label("WHAT YOU HAVE FOUND", 12, UiStyle.AMBER_DIM))
 	_clues = VBoxContainer.new()
 	_clues.add_theme_constant_override("separation", 6)

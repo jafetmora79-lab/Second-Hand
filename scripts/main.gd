@@ -31,6 +31,10 @@ var dwell := 0.0
 var dwell_clue := ""
 var zoom := 0.85
 var dragging := false
+var want_q := Quaternion.IDENTITY          ## where the held object is turning to (drags and the turn buttons set it; it eases there)
+var rest_q := Quaternion.IDENTITY          ## how it lay on the mat, for "Reset"
+const REST_H := 0.15                       ## the object's centre above the mat while it lies there
+const HELD_H := 0.3                        ## ...and while you hold it up to look: clear of the mat however you turn it
 var day_log := {"bought": 0, "sold": 0, "spent": 0, "earned": 0}
 var shelf_slots: Array = []
 
@@ -120,9 +124,11 @@ func _place_item() -> void:
 	if item_node != null:
 		item_node.queue_free()
 	pivot.basis = Basis(Vector3.UP, rng.randf_range(-0.6, 0.6))
+	rest_q = pivot.quaternion
+	want_q = rest_q
 	item_node = Models.build(item)
 	pivot.add_child(item_node)
-	pivot.position = Shop.MAT + Vector3(0, 0.15, 0)
+	pivot.position = Shop.MAT + Vector3(0, REST_H, 0)
 	pivot.scale = Vector3.ONE * 0.01
 	create_tween().tween_property(pivot, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
@@ -186,12 +192,38 @@ func start_inspect() -> void:
 		return
 	state = "inspect"
 	zoom = 0.75
+	_lift(HELD_H)
 	ui.show_inspect(item)
 
 func stop_inspect() -> void:
 	state = "talk"
+	want_q = rest_q
+	_lift(REST_H)
 	_shop_view()
 	ui.show_seller_actions()
+
+## Raises the object off the mat to look at it, or sets it back down.
+func _lift(h: float) -> void:
+	create_tween().tween_property(pivot, "position", Shop.MAT + Vector3(0, h, 0), 0.35).set_trans(Tween.TRANS_SINE)
+
+## The turn buttons and keys: a quarter turn left or right (around the vertical), tip it toward or away from you, turn it over, or put it back as it was.
+func turn_item(how: String) -> void:
+	var right := cam.global_transform.basis.x
+	match how:
+		"left":
+			want_q = Quaternion(Vector3.UP, -PI * 0.5) * want_q
+		"right":
+			want_q = Quaternion(Vector3.UP, PI * 0.5) * want_q
+		"tip_up":
+			want_q = Quaternion(right, -PI * 0.5) * want_q
+		"tip_down":
+			want_q = Quaternion(right, PI * 0.5) * want_q
+		"flip":
+			want_q = Quaternion(right, PI) * want_q
+		"reset":
+			want_q = rest_q
+			zoom = 0.75
+	want_q = want_q.normalized()
 
 func _shop_view(instant: bool = false) -> void:
 	var to := Transform3D(Basis.looking_at(Vector3(0, 1.3, -2.2) - Vector3(0, 1.62, 0.35)), Vector3(0, 1.62, 0.35))
@@ -206,6 +238,8 @@ func _process(delta: float) -> void:
 		var target := pivot.global_position
 		var want := Transform3D(Basis.looking_at(-dir), target + dir * zoom)
 		cam.transform = cam.transform.interpolate_with(want, clampf(delta * 8.0, 0.0, 1.0))
+	if pivot != null:
+		pivot.quaternion = pivot.quaternion.slerp(want_q, clampf(delta * 12.0, 0.0, 1.0))
 	if state == "inspect":
 		_loupe(delta)
 	if figure != null and is_instance_valid(figure) and figure.has_meta("bob") and state in ["talk", "inspect", "haggle", "sell"]:
@@ -261,6 +295,21 @@ func _loupe(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if state != "inspect" and state != "haggle":
 		return
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		match (event as InputEventKey).keycode:
+			KEY_A, KEY_LEFT:
+				turn_item("left")
+			KEY_D, KEY_RIGHT:
+				turn_item("right")
+			KEY_W, KEY_UP:
+				turn_item("tip_up")
+			KEY_S, KEY_DOWN:
+				turn_item("tip_down")
+			KEY_F:
+				turn_item("flip")
+			KEY_R:
+				turn_item("reset")
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
@@ -271,9 +320,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			zoom = clampf(zoom + 0.06, 0.28, 1.0)
 	elif event is InputEventMouseMotion and dragging:
 		var mm := event as InputEventMouseMotion
-		var up := cam.global_transform.basis.y
+		## left-right spins it like a turntable (around the true vertical, so it never rolls sideways); up-down tips it toward you
 		var right := cam.global_transform.basis.x
-		pivot.global_transform.basis = (Basis(up, mm.relative.x * 0.01) * Basis(right, mm.relative.y * 0.01) * pivot.global_transform.basis).orthonormalized()
+		want_q = (Quaternion(Vector3.UP, mm.relative.x * 0.008) * Quaternion(right, mm.relative.y * 0.008) * want_q).normalized()
 
 # ---- haggling ----------------------------------------------------------------------------------------------------------------------
 

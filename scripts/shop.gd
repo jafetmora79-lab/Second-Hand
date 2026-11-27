@@ -38,14 +38,22 @@ static func build(root: Node3D) -> Dictionary:
 	# room: 6 m wide, 5 m deep, 2.9 m high
 	_box(shop, Vector3(0, -0.05, -1.5), Vector3(6.0, 0.1, 5.0), plank)
 	_box(shop, Vector3(0, 2.95, -1.5), Vector3(6.0, 0.1, 5.0), dark)
-	_box(shop, Vector3(0, 1.45, -4.0), Vector3(6.0, 2.9, 0.1), wall)
+	# the back wall, built round the window opening (x 0.3..2.5, y 0.9..2.4) so you can see out
+	_box(shop, Vector3(-1.35, 1.45, -4.0), Vector3(3.3, 2.9, 0.1), wall)
+	_box(shop, Vector3(2.75, 1.45, -4.0), Vector3(0.5, 2.9, 0.1), wall)
+	_box(shop, Vector3(1.4, 0.45, -4.0), Vector3(2.2, 0.9, 0.1), wall)
+	_box(shop, Vector3(1.4, 2.65, -4.0), Vector3(2.2, 0.5, 0.1), wall)
 	_box(shop, Vector3(-3.0, 1.45, -1.5), Vector3(0.1, 2.9, 5.0), wall)
 	_box(shop, Vector3(3.0, 1.45, -1.5), Vector3(0.1, 2.9, 5.0), wall)
 	_box(shop, Vector3(0, 1.45, 1.0), Vector3(6.0, 2.9, 0.1), wall)
 	for x in range(-5, 6):                                    ## floor board seams
 		_box(shop, Vector3(x * 0.55, 0.002, -1.5), Vector3(0.02, 0.004, 5.0), dark)
-	for y in [0.5, 1.0, 1.5, 2.0, 2.5]:                       ## wall plank seams
-		_box(shop, Vector3(0, y, -3.94), Vector3(6.0, 0.02, 0.01), trim)
+	for y in [0.5, 1.0, 1.5, 2.0, 2.5]:                       ## wall plank seams (stopping at the window)
+		if y > 0.85 and y < 2.45:
+			_box(shop, Vector3(-1.35, y, -3.94), Vector3(3.3, 0.02, 0.01), trim)
+			_box(shop, Vector3(2.75, y, -3.94), Vector3(0.5, 0.02, 0.01), trim)
+		else:
+			_box(shop, Vector3(0, y, -3.94), Vector3(6.0, 0.02, 0.01), trim)
 	_box(shop, Vector3(0, 2.85, -3.93), Vector3(6.0, 0.12, 0.06), trim)
 	# beams
 	for z in [-3.0, -1.5, 0.0]:
@@ -83,16 +91,27 @@ static func build(root: Node3D) -> Dictionary:
 	bulb_m.emission = Color(1.0, 0.8, 0.55)
 	bulb_m.emission_energy_multiplier = 1.5
 	_box(shop, Vector3(0, 2.62, -1.8), Vector3(0.3, 0.2, 0.3), bulb_m)
-	# the window on the back wall, cold light coming in, snow falling outside
-	var win := _box(shop, Vector3(1.4, 1.55, -3.96), Vector3(1.5, 1.1, 0.02), _mat(Color(0.7, 0.8, 0.95), 0.2))
-	var wm := win.material_override as StandardMaterial3D
+	# the window on the back wall: old glass you can see the town through (Outside builds the view), cold light coming in
+	var glass := _mat(Color(0.8, 0.88, 0.95, 0.05), 0.05)
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass.metallic_specular = 0.8
+	_box(shop, Vector3(1.4, 1.65, -3.97), Vector3(2.2, 1.5, 0.01), glass)
+	var wm := _mat(Color(0.7, 0.8, 0.95), 0.2)                ## the door's frosted pane
 	wm.emission_enabled = true
 	wm.emission = Color(0.55, 0.66, 0.85)
 	wm.emission_energy_multiplier = 0.9
+	# frost creeping in from the corners of the glass
+	var frost := _mat(Color(0.92, 0.95, 1.0, 0.55), 0.6)
+	frost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	for c: Vector2 in [Vector2(0.42, 0.95), Vector2(2.38, 0.95), Vector2(1.4, 0.93)]:
+		_box(shop, Vector3(c.x, c.y, -3.955), Vector3(0.24 if c.x != 1.4 else 2.2, 0.07, 0.005), frost)
 	for k in 3:
-		_box(shop, Vector3(1.4 + (k - 1) * 0.5, 1.55, -3.94), Vector3(0.05, 1.1, 0.04), trim)
-	_box(shop, Vector3(1.4, 1.55, -3.94), Vector3(1.5, 0.05, 0.04), trim)
-	_box(shop, Vector3(1.4, 0.98, -3.9), Vector3(1.6, 0.06, 0.16), trim)
+		_box(shop, Vector3(1.4 + (k - 1) * 0.73, 1.65, -3.94), Vector3(0.05, 1.5, 0.04), trim)
+	_box(shop, Vector3(1.4, 1.65, -3.94), Vector3(2.2, 0.05, 0.04), trim)
+	_box(shop, Vector3(1.4, 0.88, -3.9), Vector3(2.3, 0.06, 0.16), trim)
+	for x in [0.3, 2.5]:                                       ## the frame round the opening
+		_box(shop, Vector3(x, 1.65, -3.94), Vector3(0.08, 1.58, 0.08), trim)
+	_box(shop, Vector3(1.4, 2.42, -3.94), Vector3(2.28, 0.08, 0.08), trim)
 	var cold := OmniLight3D.new()
 	cold.position = Vector3(1.4, 1.6, -3.3)
 	cold.omni_range = 3.5
@@ -132,6 +151,8 @@ static func build(root: Node3D) -> Dictionary:
 	env.ambient_light_color = Color(0.55, 0.5, 0.48)
 	env.ambient_light_energy = 0.35
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	Outside.sky_env(env)
+	Outside.build(root)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	root.add_child(we)
