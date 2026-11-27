@@ -4,12 +4,16 @@ class_name ShopUi
 ## (how to look, the clues you have found, your estimate), the haggle panel, the loupe under the mouse, the day title and the end-of-day summary.
 
 var game: Node
+const SPEECH_TOP := -200.0                 ## where the speech box rests (offsets from the bottom of the screen)
+const SPEECH_BOTTOM := -30.0
 var loupe_at := Vector2.ZERO
 var loupe_on := false
 var loupe_progress := 0.0
 var loupe_hint := ""
 var _speech_name: Label
-var _speech_text: Label
+var _speech_text: RichTextLabel
+var _hop := HopText.new()                  ## letters typed in one by one, each with a little hop
+var _speech_tween: Tween
 var _speech: PanelContainer
 var _actions: VBoxContainer
 var _inspect: PanelContainer
@@ -49,18 +53,26 @@ func _ready() -> void:
 	_speech.anchor_bottom = 1.0
 	_speech.offset_left = -330
 	_speech.offset_right = 330
-	_speech.offset_top = -180
-	_speech.offset_bottom = -30
+	_speech.offset_top = SPEECH_TOP
+	_speech.offset_bottom = SPEECH_BOTTOM
 	_speech.visible = false
 	add_child(_speech)
 	var sv := VBoxContainer.new()
 	_speech.add_child(sv)
-	_speech_name = UiStyle.text_label("", 15, UiStyle.AMBER)
+	_speech_name = UiStyle.text_label("", 18, UiStyle.AMBER)
 	_speech_name.add_theme_font_override("font", UiStyle.ui_bold())
 	sv.add_child(_speech_name)
-	_speech_text = UiStyle.text_label("", 18, UiStyle.CREAM)
+	_speech_text = RichTextLabel.new()
+	_speech_text.bbcode_enabled = true
+	_speech_text.fit_content = true
+	_speech_text.scroll_active = false
 	_speech_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_speech_text.custom_minimum_size = Vector2(620, 0)
+	_speech_text.custom_effects = [_hop]
+	_speech_text.add_theme_font_override("normal_font", UiStyle.ui_font())
+	_speech_text.add_theme_font_size_override("normal_font_size", UiStyle.px(18))
+	_speech_text.add_theme_color_override("default_color", UiStyle.CREAM)
+	_speech_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sv.add_child(_speech_text)
 	_actions = VBoxContainer.new()
 	_actions.anchor_left = 1.0
@@ -105,7 +117,7 @@ func _panel_right(width: float) -> PanelContainer:
 	p.anchor_right = 1.0
 	p.offset_left = -width - 24
 	p.offset_right = -24
-	p.offset_top = 80
+	p.offset_top = 64
 	p.visible = false
 	add_child(p)
 	return p
@@ -126,17 +138,22 @@ func _build_tip() -> void:
 	_tip_text = UiStyle.text_label("", 16, UiStyle.CREAM)
 	_tip_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tip_text.custom_minimum_size = Vector2(470, 0)
+	_tip_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(_tip_text)
 	var skip := Button.new()
 	skip.text = "Skip tips"
-	skip.add_theme_font_size_override("font_size", 13)
+	skip.add_theme_font_size_override("font_size", UiStyle.px(13))
 	skip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	skip.pressed.connect(func() -> void: game.skip_tutorial())
 	h.add_child(skip)
 
+## A tip for the guided first customer. While the inspect or haggle panel fills the right of the screen, it moves to the left.
 func show_tip(text: String) -> void:
 	_tip_text.text = text
 	_tip.visible = true
+	var left := (_inspect != null and _inspect.visible) or (_haggle != null and _haggle.visible)
+	_tip.offset_left = -600.0 if left else -190.0
+	_tip.offset_right = 0.0 if left else 410.0
 
 func hide_tip() -> void:
 	_tip.visible = false
@@ -168,7 +185,7 @@ func _build_feed() -> void:
 	_feed_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_feed_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	v.add_child(_feed_tex)
-	_feed_note = UiStyle.text_label("", 15, UiStyle.CREAM)
+	_feed_note = UiStyle.text_label("", 18, UiStyle.CREAM)
 	_feed_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_feed_note.custom_minimum_size = Vector2(384, 0)
 	v.add_child(_feed_note)
@@ -202,14 +219,14 @@ func show_robbery_actions() -> void:
 		game.rob_alarm())
 
 func _build_inspect() -> void:
-	_inspect = _panel_right(330)
+	_inspect = _panel_right(480)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	_inspect.add_child(v)
 	v.add_child(UiStyle.title_label("Inspect", 28))
 	var how := UiStyle.text_label("Drag to turn it, or use the buttons (keys A D W S, F to turn over, R to reset). Scroll to look closer. Rest the loupe on anything that catches your eye.", 14, UiStyle.MUTED)
 	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	how.custom_minimum_size = Vector2(290, 0)
+	how.custom_minimum_size = Vector2(440, 0)
 	v.add_child(how)
 	var grid := GridContainer.new()                     ## turn it without dragging: quarter turns, turn it over, put it back as it was
 	grid.columns = 3
@@ -219,7 +236,7 @@ func _build_inspect() -> void:
 		var btn := Button.new()
 		btn.text = b[0]
 		btn.custom_minimum_size = Vector2(94, 34)
-		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_font_size_override("font_size", UiStyle.px(14))
 		var how_turn: String = b[1]
 		btn.pressed.connect(func() -> void: game.turn_item(how_turn))
 		grid.add_child(btn)
@@ -254,7 +271,7 @@ func _build_haggle() -> void:
 	v.add_child(_ask_label)
 	var prow := HBoxContainer.new()
 	prow.add_theme_constant_override("separation", 5)
-	_patience = UiStyle.text_label("Patience", 14, UiStyle.MUTED)
+	_patience = UiStyle.text_label("Patience", 18, UiStyle.MUTED)
 	prow.add_child(_patience)
 	for k in 5:
 		var pip := Panel.new()
@@ -304,12 +321,31 @@ func _build_haggle() -> void:
 
 # ---- what the game calls -------------------------------------------------------------------------------------------------------------
 
+## A line of speech. The box rises from below the screen with a small overshoot the first time (and gives a little bounce for each new
+## line after that); the words are typed in letter by letter, each letter hopping as it lands.
 func say(who: String, text: String) -> void:
-	_speech.visible = true
 	_speech_name.text = who.to_upper()
-	_speech_text.text = text
-	_speech.modulate.a = 0.0
-	create_tween().tween_property(_speech, "modulate:a", 1.0, 0.25)
+	_speech_text.text = "[hop]" + text.replace("[", "[lb]") + "[/hop]"
+	_hop.restart()
+	if _speech_tween != null and _speech_tween.is_valid():
+		_speech_tween.kill()
+	_speech_tween = create_tween().set_parallel(true)
+	if not _speech.visible:
+		_speech.visible = true
+		_speech.offset_top = SPEECH_TOP + 260.0
+		_speech.offset_bottom = SPEECH_BOTTOM + 260.0
+		_speech.modulate.a = 1.0
+		_speech_tween.tween_property(_speech, "offset_top", SPEECH_TOP, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_speech_tween.tween_property(_speech, "offset_bottom", SPEECH_BOTTOM, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	else:
+		_speech.offset_top = SPEECH_TOP + 14.0
+		_speech.offset_bottom = SPEECH_BOTTOM + 14.0
+		_speech_tween.tween_property(_speech, "offset_top", SPEECH_TOP, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_speech_tween.tween_property(_speech, "offset_bottom", SPEECH_BOTTOM, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## True while a line is still being typed out.
+func speaking() -> bool:
+	return _speech.visible and not _hop.done(_speech_text.get_total_character_count())
 
 func hide_actions() -> void:
 	for c in _actions.get_children():
@@ -321,7 +357,7 @@ func _action(text: String, cb: Callable) -> void:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(0, 46)
-	b.add_theme_font_size_override("font_size", 19)
+	b.add_theme_font_size_override("font_size", UiStyle.px(19))
 	b.pressed.connect(cb)
 	_actions.add_child(b)
 
@@ -362,13 +398,13 @@ func refresh_inspect(item: Dictionary) -> void:
 	for c in _clues.get_children():
 		c.queue_free()
 	if item["found"].is_empty():
-		_clues.add_child(UiStyle.text_label("Nothing yet.", 15, UiStyle.MUTED))
+		_clues.add_child(UiStyle.text_label("Nothing yet.", 18, UiStyle.MUTED))
 	for cl: Dictionary in item["clues"]:
 		if cl["id"] in item["found"]:
 			var col := UiStyle.DANGER if cl.get("fake", false) or cl.get("damage", false) else UiStyle.MONEY
-			var l := UiStyle.text_label("• " + String(cl["text"]), 15, col)
+			var l := UiStyle.text_label("• " + String(cl["text"]), 18, col)
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			l.custom_minimum_size = Vector2(290, 0)
+			l.custom_minimum_size = Vector2(440, 0)
 			_clues.add_child(l)
 	var est := Items.estimate(item)
 	_estimate.text = "$%d to $%d" % [int(est.x), int(est.y)]
@@ -442,6 +478,10 @@ func show_summary(t: String, text: String, button: String, cb: Callable) -> void
 # ---- drawing: top bar, loupe, toasts --------------------------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	# the speech box moves left, out from under the inspect or haggle panel while one is open, and back when it closes
+	var side := -600.0 if (_inspect.visible or _haggle.visible) else -330.0
+	_speech.offset_left = lerpf(_speech.offset_left, side, clampf(delta * 10.0, 0.0, 1.0))
+	_speech.offset_right = _speech.offset_left + 660.0
 	_toast_t = maxf(0.0, _toast_t - delta)
 	for fx: Array in _cash_fx:
 		fx[1] -= delta
@@ -456,17 +496,17 @@ func _draw() -> void:
 	# top bar
 	var bar := Rect2(Vector2(20, 16), Vector2(size.x - 40, 48))
 	UiStyle.draw_panel(self, bar)
-	draw_string(UiStyle.title_font(), bar.position + Vector2(18, 33), "Second Hand", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiStyle.AMBER)
-	draw_string(bold, bar.position + Vector2(200, 31), "DAY %d" % game.day, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UiStyle.CREAM)
+	draw_string(UiStyle.title_font(), bar.position + Vector2(18, 33), "Second Hand", HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(22), UiStyle.AMBER)
+	draw_string(bold, bar.position + Vector2(200, 31), "DAY %d" % game.day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(16), UiStyle.CREAM)
 	var rent_left: int = game.RENT_DAY - game.day
-	draw_string(font, bar.position + Vector2(290, 31), ("Rent $%d due in %d days" % [game.RENT, rent_left]) if rent_left > 0 else ("Rent $%d due tonight" % game.RENT), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UiStyle.DANGER if rent_left <= 1 else UiStyle.MUTED)
-	draw_string(font, bar.position + Vector2(bar.size.x - 380, 31), "On the shelves: %d" % game.stock.size(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UiStyle.MUTED)
+	draw_string(font, bar.position + Vector2(290, 31), ("Rent $%d due in %d days" % [game.RENT, rent_left]) if rent_left > 0 else ("Rent $%d due tonight" % game.RENT), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.DANGER if rent_left <= 1 else UiStyle.MUTED)
+	draw_string(font, bar.position + Vector2(bar.size.x - 380, 31), "On the shelves: %d" % game.stock.size(), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.MUTED)
 	UiStyle.icon(self, "coin", bar.position + Vector2(bar.size.x - 150, 25), 20, Color(0.95, 0.8, 0.35))
-	draw_string(bold, bar.position + Vector2(bar.size.x - 132, 32), "$%d" % int(round(_shown_money)), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UiStyle.MONEY)
+	draw_string(bold, bar.position + Vector2(bar.size.x - 132, 32), "$%d" % int(round(_shown_money)), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(20), UiStyle.MONEY)
 	for fx: Array in _cash_fx:
 		var a := clampf(fx[1], 0.0, 1.0)
 		var d: int = fx[0]
-		draw_string(bold, bar.position + Vector2(bar.size.x - 132, 60 + (1.6 - fx[1]) * 20), ("%+d" % d).replace("+", "+$").replace("-", "-$"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(UiStyle.MONEY if d > 0 else UiStyle.DANGER, a))
+		draw_string(bold, bar.position + Vector2(bar.size.x - 132, 60 + (1.6 - fx[1]) * 20), ("%+d" % d).replace("+", "+$").replace("-", "-$"), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), Color(UiStyle.MONEY if d > 0 else UiStyle.DANGER, a))
 	# the loupe
 	if game.state == "inspect":
 		var r := 34.0
@@ -476,7 +516,7 @@ func _draw() -> void:
 		if loupe_progress > 0.0:
 			draw_arc(loupe_at, r - 5, -PI * 0.5, -PI * 0.5 + TAU * clampf(loupe_progress, 0.0, 1.0), 48, UiStyle.AMBER, 4.0, true)
 		if loupe_hint != "":
-			draw_string(font, loupe_at + Vector2(-40, r + 22), loupe_hint, HORIZONTAL_ALIGNMENT_CENTER, 80, 14, UiStyle.AMBER)
+			draw_string(font, loupe_at + Vector2(-40, r + 22), loupe_hint, HORIZONTAL_ALIGNMENT_CENTER, 80, UiStyle.px(14), UiStyle.AMBER)
 	if _toast_t > 0.0:
 		var fade := minf(1.0, _toast_t * 2.0)
 		var tw := 560.0

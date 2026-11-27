@@ -41,6 +41,19 @@ var dwell := 0.0
 var dwell_clue := ""
 var zoom := 0.85
 var dragging := false
+# the view from behind the counter: look around by dragging (or the arrow keys / WASD); while a customer talks, the camera turns to
+# frame their face and narrows a little, as The Veil's conversation camera does (world.gd talk camera: FOV x0.9, ~0.4 s to settle)
+const SHOP_EYE := Vector3(0, 1.62, 0.35)
+const SHOP_LOOK := Vector3(0, 1.3, -2.2)
+const SHOP_FOV := 60.0
+const TALK_FOV_SCALE := 0.86               ## the zoom on a speaker: a touch tighter than The Veil's 0.9, the shop is small
+const TALK_EASE := 7.0                     ## ~0.4 s to settle on the speaker
+const LOOK_EASE := 10.0
+var look_yaw := 0.0                        ## the player's own look-around, relative to the counter view
+var look_pitch := 0.0
+var looking := false                       ## dragging the view right now
+var talk_focus := false                    ## a customer is talking: frame them (until the player looks away)
+const VIEW_STATES := ["idle", "walking", "at_door", "talk", "sell", "robbery", "refused"]
 var want_q := Quaternion.IDENTITY          ## where the held object is turning to (drags and the turn buttons set it; it eases there)
 var rest_q := Quaternion.IDENTITY          ## how it lay on the mat, for "Reset"
 const REST_H := 0.15                       ## the object's centre above the mat while it lies there
@@ -490,12 +503,28 @@ func turn_item(how: String) -> void:
 			zoom = 0.75
 	want_q = want_q.normalized()
 
+## Back to the view from behind the counter. The camera eases there by itself (_view, every frame); `instant` puts it there at once.
 func _shop_view(instant: bool = false) -> void:
-	var to := Transform3D(Basis.looking_at(Vector3(0, 1.3, -2.2) - Vector3(0, 1.62, 0.35)), Vector3(0, 1.62, 0.35))
 	if instant:
-		cam.transform = to
-	else:
-		create_tween().tween_property(cam, "transform", to, 0.5).set_trans(Tween.TRANS_SINE)
+		cam.transform = Transform3D(Basis.looking_at(SHOP_LOOK - SHOP_EYE), SHOP_EYE)
+		cam.fov = SHOP_FOV
+
+## The view from behind the counter, each frame: the counter view turned by the player's look-around, or, while a customer is talking,
+## turned to their face with a little zoom.
+func _view(delta: float) -> void:
+	var base := Basis.looking_at(SHOP_LOOK - SHOP_EYE)
+	var want := Basis(Vector3.UP, look_yaw) * base * Basis(Vector3.RIGHT, look_pitch)
+	var fov := SHOP_FOV
+	var rate := LOOK_EASE
+	if talk_focus and figure != null and is_instance_valid(figure) and figure.global_position.z > -3.9:
+		var info: Dictionary = visitor.get("info", {})
+		var face := figure.global_position + Vector3(0, float(info.get("height", 1.7)) * 0.9 - 0.08, 0)
+		want = Basis.looking_at(face - SHOP_EYE)
+		fov = SHOP_FOV * TALK_FOV_SCALE
+		rate = TALK_EASE
+	var k := 1.0 - exp(-rate * delta)
+	cam.transform = Transform3D(cam.transform.basis.slerp(want.orthonormalized(), k).orthonormalized(), cam.position.lerp(SHOP_EYE, k))
+	cam.fov = lerpf(cam.fov, fov, k)
 
 func _process(delta: float) -> void:
 	if state == "inspect" or state == "haggle":
@@ -503,6 +532,13 @@ func _process(delta: float) -> void:
 		var target := pivot.global_position
 		var want := Transform3D(Basis.looking_at(-dir), target + dir * zoom)
 		cam.transform = cam.transform.interpolate_with(want, clampf(delta * 8.0, 0.0, 1.0))
+		cam.fov = lerpf(cam.fov, SHOP_FOV, clampf(delta * 8.0, 0.0, 1.0))
+	elif state in VIEW_STATES:
+		var keys := Vector2(float(Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A)),
+			float(Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_S)))
+		if keys != Vector2.ZERO:
+			_look(-keys.x * 1.4 * delta, keys.y * 1.0 * delta)
+		_view(delta)
 	if pivot != null:
 		pivot.quaternion = pivot.quaternion.slerp(want_q, clampf(delta * 12.0, 0.0, 1.0))
 	if state == "inspect":
@@ -513,6 +549,7 @@ func _process(delta: float) -> void:
 ## A customer's line in the speech panel; the figure gestures while saying it (when its model has a talking clip).
 func _say(who: String, text: String) -> void:
 	ui.say(who, text)
+	talk_focus = true                                     ## turn to them while they speak (the player can look away again)
 	if figure != null and is_instance_valid(figure) and state != "walking":
 		People.play(figure, "talk")
 
@@ -560,7 +597,27 @@ func _loupe(delta: float) -> void:
 					_caught_fake(item)
 		ui.refresh_inspect(item)
 
+## Looking around from behind the counter: turn the view, within what a person turning their head and shoulders could see.
+func _look(dyaw: float, dpitch: float) -> void:
+	talk_focus = false
+	if absf(look_yaw) < 0.001 and absf(look_pitch) < 0.001:
+		# starting from the talk framing: continue from where the camera actually points, not jump back to the counter view
+		var base := Basis.looking_at(SHOP_LOOK - SHOP_EYE)
+		var f := -cam.transform.basis.z
+		var bf := -base.z
+		look_yaw = atan2(-f.x, -f.z) - atan2(-bf.x, -bf.z)
+		look_pitch = asin(clampf(f.y, -1.0, 1.0)) - asin(clampf(bf.y, -1.0, 1.0))
+	look_yaw = clampf(wrapf(look_yaw + dyaw, -PI, PI), -1.35, 1.35)
+	look_pitch = clampf(look_pitch + dpitch, -0.55, 0.6)
+
 func _unhandled_input(event: InputEvent) -> void:
+	if state in VIEW_STATES:
+		if event is InputEventMouseButton and ((event as InputEventMouseButton).button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]):
+			looking = (event as InputEventMouseButton).pressed
+		elif event is InputEventMouseMotion and looking:
+			var mm := event as InputEventMouseMotion
+			_look(-mm.relative.x * 0.004, -mm.relative.y * 0.004)
+		return
 	if state != "inspect" and state != "haggle":
 		return
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:

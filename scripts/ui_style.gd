@@ -1,7 +1,7 @@
 extends RefCounted
 class_name UiStyle
 ## The game's look for everything on screen: the HUD, the main menu, the pause menu and their panels. Warm amber on dark, frosted-glass panels with thin
-## warm borders; a serif for titles and a clean sans for everything else (both system fonts, so nothing has to ship). Also the small vector icons the
+## warm borders; The Veil's pixel font for all text (assets/fonts/VeilPixel.ttf), at sizes snapped to its pixel grid. Also the small vector icons the
 ## HUD draws (flame, bowl, boot, log, firewood, coin, plank, furnace, sun, moon, snowflake) so no image files are needed.
 
 const AMBER := Color(0.98, 0.78, 0.42)
@@ -18,35 +18,36 @@ const ICE := Color(0.62, 0.82, 1.0)
 const MONEY := Color(0.62, 0.92, 0.56)
 const DANGER := Color(0.95, 0.42, 0.36)
 
-static var _title_font: Font = null
-static var _ui_font: Font = null
-static var _ui_bold: Font = null
+static var _pixel: FontFile = null
+
+## The Veil's pixel font (assets/fonts/VeilPixel.ttf, square-pixel glyphs on a 13 px em), drawn without smoothing so every pixel stays
+## crisp. Characters it lacks (the cent and registered signs, the bullet) fall back to Godot's built-in font.
+static func pixel_font() -> FontFile:
+	if _pixel == null:
+		_pixel = load("res://assets/fonts/VeilPixel.ttf") as FontFile
+		_pixel.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		_pixel.hinting = TextServer.HINTING_NONE
+		_pixel.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+		_pixel.generate_mipmaps = false
+		_pixel.fallbacks = [ThemeDB.fallback_font]
+	return _pixel
+
+## A text size snapped to a whole multiple of the pixel font's 13 px em, so it stays crisp: small print 13, text 26, titles 39 and 52.
+static func px(size: int) -> int:
+	if size <= 15:
+		return 13
+	if size <= 32:
+		return 26
+	return 39 if size <= 45 else 52
 
 static func title_font() -> Font:
-	if _title_font == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Book Antiqua", "Cambria", "Times New Roman", "serif"])
-		f.font_weight = 700
-		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-		_title_font = f
-	return _title_font
+	return pixel_font()
 
 static func ui_font() -> Font:
-	if _ui_font == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Segoe UI", "Bahnschrift", "Calibri", "Arial", "sans-serif"])
-		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-		_ui_font = f
-	return _ui_font
+	return pixel_font()
 
 static func ui_bold() -> Font:
-	if _ui_bold == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Segoe UI Semibold", "Segoe UI", "Bahnschrift", "Calibri", "Arial", "sans-serif"])
-		f.font_weight = 600
-		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-		_ui_bold = f
-	return _ui_bold
+	return pixel_font()
 
 ## A rounded frosted panel.
 static func panel_box(bg: Color = PANEL, radius: int = 10, border: Color = EDGE, pad: float = 14.0) -> StyleBoxFlat:
@@ -65,7 +66,7 @@ static func panel_box(bg: Color = PANEL, radius: int = 10, border: Color = EDGE,
 static func menu_theme() -> Theme:
 	var t := Theme.new()
 	t.default_font = ui_font()
-	t.default_font_size = 18
+	t.default_font_size = px(18)
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(1, 1, 1, 0.04)
 	normal.border_color = Color(1, 1, 1, 0.08)
@@ -132,7 +133,7 @@ static func title_label(text: String, size: int, col: Color = AMBER) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_override("font", title_font())
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", px(size))
 	l.add_theme_color_override("font_color", col)
 	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
 	l.add_theme_constant_override("shadow_offset_y", 3)
@@ -142,7 +143,7 @@ static func title_label(text: String, size: int, col: Color = AMBER) -> Label:
 static func text_label(text: String, size: int = 16, col: Color = MUTED) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", px(size))
 	l.add_theme_color_override("font_color", col)
 	return l
 
