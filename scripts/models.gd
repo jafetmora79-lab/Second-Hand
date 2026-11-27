@@ -50,6 +50,7 @@ static func build(item: Dictionary) -> Node3D:
 		var model := (load(path) as PackedScene).instantiate() as Node3D
 		root.add_child(model)
 		_fit(model)
+		_aim_clues(root, model, item["clues"])
 	else:
 		_stand_in(root, String(item["kind"]))
 	for c: Dictionary in item["clues"]:
@@ -75,6 +76,47 @@ static func _rel(root: Node3D, n: Node3D) -> Transform3D:
 			t = (cur as Node3D).transform * t
 		cur = cur.get_parent()
 	return t
+
+const SIDES := {"bottom": Vector3(0, -1, 0), "top": Vector3(0, 1, 0), "front": Vector3(0, 0, 1), "back": Vector3(0, 0, -1), "right": Vector3(1, 0, 0), "left": Vector3(-1, 0, 0)}
+
+## Puts each clue that says where it is ("from" a side, "at" a spot on that side as fractions of the half-size) onto the model's real surface:
+## a ray from that side onto the mesh. Works for any model, so new Meshy models need no hand-placed coordinates.
+static func _aim_clues(root: Node3D, model: Node3D, clues: Array) -> void:
+	var tris := PackedVector3Array()
+	var box := AABB()
+	var first := true
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		var xf := _rel(root, m)
+		var faces := m.mesh.get_faces()
+		for v in faces:
+			var w: Vector3 = xf * v
+			tris.append(w)
+			box = AABB(w, Vector3.ZERO) if first else box.expand(w)
+			first = false
+	var c0 := box.get_center()
+	var half := box.size * 0.5
+	for c: Dictionary in clues:
+		if not c.has("from"):
+			continue
+		var n: Vector3 = SIDES[c["from"]]
+		var at: Vector2 = c.get("at", Vector2.ZERO)
+		var ua := Vector3(1, 0, 0) if absf(n.x) < 0.5 else Vector3(0, 0, 1)
+		var va := Vector3(0, 0, 1) if absf(n.y) > 0.5 else Vector3(0, 1, 0)
+		var origin := c0 + ua * at.x * (ua.abs().dot(half)) + va * at.y * (va.abs().dot(half)) + n * (n.abs().dot(half) + 0.05)
+		var best := INF
+		var hit := Vector3.INF
+		for i in range(0, tris.size(), 3):
+			var r = Geometry3D.ray_intersects_triangle(origin, -n, tris[i], tris[i + 1], tris[i + 2])
+			if r != null:
+				var d := origin.distance_to(r)
+				if d < best:
+					best = d
+					hit = r
+		c["pos"] = hit if hit != Vector3.INF else c0 + n * n.abs().dot(half)
+		c["normal"] = n
 
 ## Scales and centres a Meshy model so its largest side is SIZE and it sits centred on the origin.
 static func _fit(model: Node3D) -> void:
@@ -153,15 +195,20 @@ static func _draw_clue(root: Node3D, c: Dictionary) -> void:
 		l.double_sided = false
 		l.no_depth_test = false
 		l.position = pos
-		match String(c.get("face", "front")):
-			"bottom":
-				l.rotation = Vector3(PI * 0.5, 0, 0)
-				l.position.y -= 0.002
-			"back":
-				l.rotation = Vector3(0, PI, 0)
-				l.position.z -= 0.002
-			_:
-				l.position.z += 0.002
+		if c.has("normal"):
+			var n: Vector3 = c["normal"]
+			l.basis = Basis.looking_at(-n, Vector3(0, 0, -1) if absf(n.y) > 0.9 else Vector3.UP)        ## its readable side faces out from the object
+			l.position += n * 0.002
+		else:
+			match String(c.get("face", "front")):
+				"bottom":
+					l.rotation = Vector3(PI * 0.5, 0, 0)
+					l.position.y -= 0.002
+				"back":
+					l.rotation = Vector3(0, PI, 0)
+					l.position.z -= 0.002
+				_:
+					l.position.z += 0.002
 		l.set_meta("clue", true)
 		root.add_child(l)
 	elif c.get("damage", false):

@@ -2,3 +2,4 @@ build/
 .godot/
 *.tmp
 tools/shots/
+docs/concepts/raw/

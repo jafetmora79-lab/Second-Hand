@@ -9,54 +9,54 @@ const KINDS := {
 	"music_box": {
 		"name": "Music box", "cat": "curios", "base": 180, "fake_value": 15,
 		"clues": [
-			{"id": "mark", "pos": Vector3(0, -0.075, 0), "text": "Stamped underneath: \"J. Lindqvist, Oslo 1904\". A known maker.", "mult": 1.6, "label": "J.LINDQVIST\nOSLO 1904", "face": "bottom"},
-			{"id": "comb", "pos": Vector3(0.05, 0.06, 0.0), "text": "The steel comb is missing two teeth: it plays, but not every note.", "mult": 0.7, "damage": true},
-			{"id": "inlay", "pos": Vector3(0.0, 0.08, 0.06), "text": "The flower inlay on the lid is real pearwood, cut by hand.", "mult": 1.15},
+			{"id": "mark", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.075, 0), "text": "Stamped underneath: \"J. Lindqvist, Oslo 1904\". A known maker.", "mult": 1.6, "label": "J.LINDQVIST\nOSLO 1904", "face": "bottom"},
+			{"id": "comb", "from": "top", "at": Vector2(0.0, 0.15), "pos": Vector3(0.05, 0.06, 0.0), "text": "The steel comb is missing two teeth: it plays, but not every note.", "mult": 0.7, "damage": true},
+			{"id": "inlay", "from": "front", "at": Vector2(0.0, -0.35), "pos": Vector3(0.0, 0.08, 0.06), "text": "The flower inlay is real pearwood, cut by hand.", "mult": 1.15},
 		],
 		"fake_clues": [
-			{"id": "fake_mark", "pos": Vector3(0, -0.075, 0), "text": "The stamp says \"Lindqvist\" but the letters are printed, not struck: a modern copy.", "fake": true, "label": "LINDQVIST\n(printed)", "face": "bottom"},
+			{"id": "fake_mark", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.075, 0), "text": "The stamp says \"Lindqvist\" but the letters are printed, not struck: a modern copy.", "fake": true, "label": "LINDQVIST\n(printed)", "face": "bottom"},
 		],
 	},
 	"pocket_watch": {
 		"name": "Pocket watch", "cat": "watches", "base": 240, "fake_value": 20,
 		"clues": [
-			{"id": "hallmark", "pos": Vector3(0, 0, -0.012), "text": "Hallmarks inside the back cover: sterling silver, 1911.", "mult": 1.5, "label": "925 · 1911", "face": "back"},
-			{"id": "crystal", "pos": Vector3(0.0, 0.0, 0.016), "text": "A hairline crack across the crystal.", "mult": 0.8, "damage": true},
-			{"id": "crown", "pos": Vector3(0, 0.055, 0), "text": "The winding crown turns smoothly: the movement runs.", "mult": 1.2},
+			{"id": "hallmark", "from": "back", "at": Vector2(0.1, -0.1), "pos": Vector3(0, 0, -0.012), "text": "Hallmarks on the back of the case: sterling silver, 1911.", "mult": 1.5, "label": "925 · 1911", "face": "back"},
+			{"id": "crystal", "from": "front", "at": Vector2(-0.05, -0.1), "pos": Vector3(0.0, 0.0, 0.016), "text": "A hairline crack across the crystal.", "mult": 0.8, "damage": true},
+			{"id": "crown", "from": "top", "at": Vector2(-0.05, 0.0), "pos": Vector3(0, 0.055, 0), "text": "The winding crown turns smoothly: the movement runs.", "mult": 1.2},
 		],
 		"fake_clues": [
-			{"id": "fake_hallmark", "pos": Vector3(0, 0, -0.012), "text": "The \"silver\" hallmark is too crisp and the case is light: plated brass.", "fake": true, "label": "925 ???", "face": "back"},
+			{"id": "fake_hallmark", "from": "back", "at": Vector2(0.1, -0.1), "pos": Vector3(0, 0, -0.012), "text": "The \"silver\" hallmark is too crisp and the case is light: plated brass.", "fake": true, "label": "925 ???", "face": "back"},
 		],
 	},
 	"carved_bear": {
 		"name": "Carved bear", "cat": "folk art", "base": 120, "fake_value": 10,
 		"clues": [
-			{"id": "signature", "pos": Vector3(0, -0.06, 0), "text": "Carved under the base: \"E.H.\" Eli Harlan, the old trapper-carver.", "mult": 2.2, "label": "E.H.", "face": "bottom"},
-			{"id": "ear", "pos": Vector3(0.05, 0.07, 0.03), "text": "One ear was snapped off and glued back.", "mult": 0.75, "damage": true},
+			{"id": "signature", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.06, 0), "text": "Carved under the base: \"E.H.\" Eli Harlan, the old trapper-carver.", "mult": 2.2, "label": "E.H.", "face": "bottom"},
+			{"id": "ear", "from": "top", "at": Vector2(0.35, 0.45), "pos": Vector3(0.05, 0.07, 0.03), "text": "One ear was snapped off and glued back.", "mult": 0.75, "damage": true},
 		],
 		"fake_clues": [
-			{"id": "fake_cuts", "pos": Vector3(0.0, 0.03, 0.06), "text": "The knife cuts are too even: machine-carved, then roughened.", "fake": true},
+			{"id": "fake_cuts", "from": "right", "at": Vector2(0.0, 0.1), "pos": Vector3(0.0, 0.03, 0.06), "text": "The knife cuts are too even: machine-carved, then roughened.", "fake": true},
 		],
 	},
 	"compass": {
 		"name": "Brass compass", "cat": "instruments", "base": 150, "fake_value": 12,
 		"clues": [
-			{"id": "maker", "pos": Vector3(0, -0.012, 0), "text": "Engraved underneath: \"Hall & Sons, Survey No. 2\".", "mult": 1.5, "label": "HALL & SONS\nSURVEY No.2", "face": "bottom"},
-			{"id": "needle", "pos": Vector3(0, 0.012, 0), "text": "The needle still swings true to north.", "mult": 1.1},
-			{"id": "dent", "pos": Vector3(0.045, 0.0, 0.0), "text": "A dent in the rim from a fall.", "mult": 0.85, "damage": true},
+			{"id": "maker", "from": "bottom", "at": Vector2(0, 0.1), "pos": Vector3(0, -0.012, 0), "text": "Engraved underneath: \"Hall & Sons, Survey No. 2\".", "mult": 1.5, "label": "HALL & SONS\nSURVEY No.2", "face": "bottom"},
+			{"id": "needle", "from": "top", "at": Vector2(0.0, 0.15), "pos": Vector3(0, 0.012, 0), "text": "The needle still swings true to north.", "mult": 1.1},
+			{"id": "dent", "from": "right", "at": Vector2(0.0, -0.55), "pos": Vector3(0.045, 0.0, 0.0), "text": "A dent in the rim from a fall.", "mult": 0.85, "damage": true},
 		],
 		"fake_clues": [
-			{"id": "fake_patina", "pos": Vector3(0.0, -0.012, 0.0), "text": "The green patina rubs off on your finger: painted on.", "fake": true},
+			{"id": "fake_patina", "from": "bottom", "at": Vector2(0.3, 0.3), "pos": Vector3(0.0, -0.012, 0.0), "text": "The green patina rubs off on your finger: painted on.", "fake": true},
 		],
 	},
 	"lantern": {
 		"name": "Oil lantern", "cat": "household", "base": 70, "fake_value": 8,
 		"clues": [
-			{"id": "stamp", "pos": Vector3(0, -0.1, 0.0), "text": "Embossed on the tank: \"Dietz No. 2 Blizzard\". Collectors want these.", "mult": 1.8, "label": "DIETZ No.2\nBLIZZARD", "face": "bottom"},
-			{"id": "glass", "pos": Vector3(0.04, 0.0, 0.0), "text": "The glass globe has a chip near the top.", "mult": 0.8, "damage": true},
+			{"id": "stamp", "from": "front", "at": Vector2(0.0, -0.8), "pos": Vector3(0, -0.1, 0.0), "text": "Embossed on the tank: \"Dietz No. 2 Blizzard\". Collectors want these.", "mult": 1.8, "label": "DIETZ No.2\nBLIZZARD", "face": "bottom"},
+			{"id": "glass", "from": "front", "at": Vector2(0.2, 0.0), "pos": Vector3(0.04, 0.0, 0.0), "text": "The glass globe has a chip near the top.", "mult": 0.8, "damage": true},
 		],
 		"fake_clues": [
-			{"id": "fake_weld", "pos": Vector3(0.0, -0.06, 0.04), "text": "Spot welds where there should be rivets: a reproduction.", "fake": true},
+			{"id": "fake_weld", "from": "right", "at": Vector2(0.0, -0.6), "pos": Vector3(0.0, -0.06, 0.04), "text": "Spot welds where there should be rivets: a reproduction.", "fake": true},
 		],
 	},
 	"camera": {
@@ -96,14 +96,16 @@ static func make(kind: String, rng: RandomNumberGenerator, fake_chance: float = 
 	var k: Dictionary = KINDS[kind]
 	var fake := rng.randf() < fake_chance
 	var clues: Array = []
-	for c: Dictionary in k["clues"]:
+	for c0: Dictionary in k["clues"]:
+		var c := c0.duplicate()
 		if c.has("damage") and rng.randf() < 0.45:
 			continue                                     ## not every piece is damaged
 		if fake and c["id"] in ["mark", "hallmark", "signature", "maker", "stamp", "lens", "plate", "crown"]:
 			continue                                     ## a fake's mark is the fake tell instead
 		clues.append(c)
 	if fake:
-		clues.append_array(k["fake_clues"])
+		for f0: Dictionary in k["fake_clues"]:
+			clues.append(f0.duplicate())
 	var value := float(k["base"])
 	for c2: Dictionary in clues:
 		value *= float(c2.get("mult", 1.0))
