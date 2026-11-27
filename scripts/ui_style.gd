@@ -157,67 +157,54 @@ const WOOD := Color(0.12, 0.085, 0.06, 0.95)
 const GREEN := Color(0.24, 0.45, 0.24)
 const RED := Color(0.55, 0.18, 0.13)
 
-## An appraisal-notebook page: warm parchment with a brass edge and a soft shadow.
-static func parchment_box(pad: float = 18.0) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = PARCH
-	sb.border_color = Color(0.45, 0.32, 0.16)
-	sb.set_border_width_all(3)
-	sb.set_corner_radius_all(4)
+## The pieces cut from the HUD sheet (tools/slice_ui.py), as 9-slice boxes: the corners stay crisp, the middle stretches.
+static var _tex := {}
+static func ui_tex(piece: String) -> Texture2D:
+	if not _tex.has(piece):
+		_tex[piece] = load("res://assets/ui/%s.png" % piece) as Texture2D
+	return _tex[piece]
+
+static func tex_box(piece: String, margin: float, pad: float) -> StyleBoxTexture:
+	var sb := StyleBoxTexture.new()
+	sb.texture = ui_tex(piece)
+	sb.set_texture_margin_all(margin)
 	sb.set_content_margin_all(pad)
-	sb.shadow_color = Color(0, 0, 0, 0.45)
-	sb.shadow_size = 10
-	sb.shadow_offset = Vector2(0, 4)
 	return sb
 
-## Dark stained wood with a thin brass edge: the speech box and the plaques.
-static func wood_box(pad: float = 14.0, radius: int = 6) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = WOOD
-	sb.border_color = Color(BRASS, 0.85)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(radius)
-	sb.set_content_margin_all(pad)
-	sb.shadow_color = Color(0, 0, 0, 0.4)
-	sb.shadow_size = 8
-	return sb
+## An appraisal-notebook page: parchment with a gold edge. "parch_tall" for the notes card, "parch_wide" for cards and tips,
+## "parch_strip" for slips.
+static func parchment_box(pad: float = 18.0, piece: String = "parch_wide") -> StyleBoxTexture:
+	return tex_box(piece, 16.0, pad)
 
-## A button in one of the shop's kinds: "go" (green), "stop" (red), "paper" (on parchment) or "wood" (the default, on dark).
+## Dark stained wood with a gold edge: the speech box ("dark_wide"), the plaques and the controls strip ("dark_long"), frames ("dark_square").
+static func wood_box(pad: float = 14.0, piece: String = "dark_wide") -> StyleBoxTexture:
+	return tex_box(piece, 14.0, pad)
+
+const _BUTTON_PIECE := {"go": "btn_go", "stop": "btn_stop", "paper": "btn_paper", "wood": "btn_plank", "dark": "btn_dark"}
+
+## A button in one of the shop's kinds: "go" (green), "stop" (red), "paper" (parchment), "wood" (a plank, the default) or "dark";
+## or an arrow ("arrow_ll", "arrow_l", "arrow_r", "arrow_rr"), whose picture is the whole button.
 static func style_button(b: Button, kind: String = "wood", size: int = 18) -> void:
-	var base: Color
-	var text := CREAM
-	match kind:
-		"go":
-			base = GREEN
-		"stop":
-			base = RED
-		"paper":
-			base = Color(0.85, 0.77, 0.6)
-			text = INK
-		_:
-			base = Color(0.2, 0.14, 0.09)
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = base
-	normal.border_color = base.darkened(0.45) if kind == "paper" else Color(BRASS, 0.9)
-	normal.set_border_width_all(2)
-	normal.border_width_bottom = 4                              ## a little depth, like a real button
-	normal.set_corner_radius_all(5)
-	normal.content_margin_left = 16
-	normal.content_margin_right = 16
-	normal.content_margin_top = 8
-	normal.content_margin_bottom = 8
-	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = base.lightened(0.12)
-	hover.border_color = AMBER
-	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = base.darkened(0.12)
-	pressed.border_width_bottom = 2
-	pressed.content_margin_top = 10
-	for st: Array in [["normal", normal], ["hover", hover], ["pressed", pressed], ["hover_pressed", pressed], ["focus", hover]]:
+	var piece: String = _BUTTON_PIECE.get(kind, kind)
+	var arrow := piece.begins_with("arrow")
+	var normal := tex_box(piece, 6.0 if arrow else 11.0, 0.0)
+	normal.content_margin_left = 18
+	normal.content_margin_right = 18
+	normal.content_margin_top = 7
+	normal.content_margin_bottom = 9
+	var hover := normal.duplicate() as StyleBoxTexture
+	hover.modulate_color = Color(1.15, 1.12, 1.05)
+	var pressed := normal.duplicate() as StyleBoxTexture
+	pressed.modulate_color = Color(0.82, 0.8, 0.78)
+	pressed.content_margin_top = 9
+	pressed.content_margin_bottom = 7
+	for st: Array in [["normal", normal], ["hover", hover], ["pressed", pressed], ["hover_pressed", pressed], ["focus", StyleBoxEmpty.new()]]:
 		b.add_theme_stylebox_override(st[0], st[1])
+	var text := INK if kind == "paper" else CREAM
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(c, text)
 	b.add_theme_font_size_override("font_size", px(size))
+	b.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 # ---- vector icons, drawn on any CanvasItem (c = centre, s = size in px) ----------------------------------------------------------------
 

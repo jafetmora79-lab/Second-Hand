@@ -53,6 +53,7 @@ var _shown_money := 0.0
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST     ## the HUD sheet is pixel art: keep its edges crisp
 	theme = UiStyle.menu_theme()
 	_build_speech()
 	_actions = VBoxContainer.new()
@@ -111,12 +112,7 @@ func _build_speech() -> void:
 	_speech.add_child(h)
 	# the portrait: a little window onto the speaker's face, in a brass frame
 	_portrait_frame = PanelContainer.new()
-	var pf := StyleBoxFlat.new()
-	pf.bg_color = Color(0.05, 0.04, 0.03)
-	pf.border_color = UiStyle.BRASS
-	pf.set_border_width_all(3)
-	pf.set_corner_radius_all(4)
-	pf.set_content_margin_all(3)
+	var pf := UiStyle.wood_box(7.0, "dark_square")
 	_portrait_frame.add_theme_stylebox_override("panel", pf)
 	_portrait_frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(_portrait_frame)
@@ -156,7 +152,7 @@ func _build_speech() -> void:
 
 func _card(width: float) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiStyle.parchment_box(18.0))
+	p.add_theme_stylebox_override("panel", UiStyle.parchment_box(20.0, "parch_tall"))
 	p.anchor_left = 1.0
 	p.anchor_right = 1.0
 	p.offset_left = -width - 24
@@ -223,8 +219,10 @@ func _build_haggle() -> void:
 	var pl := UiStyle.text_label("Patience", 13, UiStyle.INK_SOFT)     ## no wrapping: in a row it would wrap letter by letter
 	prow.add_child(pl)
 	for k in 5:
-		var pip := Panel.new()
-		pip.custom_minimum_size = Vector2(12, 12)
+		var pip := TextureRect.new()
+		pip.texture = UiStyle.ui_tex("pip_full")
+		pip.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pip.custom_minimum_size = Vector2(18, 18)
 		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		prow.add_child(pip)
 		_pips.append(pip)
@@ -237,13 +235,13 @@ func _build_haggle() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 6)
 	for d: int in [-25, -5]:
-		row.add_child(_step_button("<<" if d == -25 else "<", d))
+		row.add_child(_step_button("arrow_ll" if d == -25 else "arrow_l", d))
 	_offer_label = _ink("", 26)
 	_offer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_offer_label.custom_minimum_size = Vector2(110, 0)
 	row.add_child(_offer_label)
 	for d2: int in [5, 25]:
-		row.add_child(_step_button(">" if d2 == 5 else ">>", d2))
+		row.add_child(_step_button("arrow_r" if d2 == 5 else "arrow_rr", d2))
 	v.add_child(row)
 	var present := Button.new()
 	present.text = "Present offer"
@@ -275,11 +273,10 @@ func _build_haggle() -> void:
 	two.add_child(walk)
 	v.add_child(two)
 
-func _step_button(text: String, d: int) -> Button:
+func _step_button(piece: String, d: int) -> Button:
 	var b := Button.new()
-	b.text = text
-	UiStyle.style_button(b, "paper", 18)
-	b.custom_minimum_size = Vector2(44, 40)
+	UiStyle.style_button(b, piece, 18)                       ## the arrow is drawn on the sheet's button
+	b.custom_minimum_size = Vector2(42, 38)
 	b.pressed.connect(func() -> void:
 		_offer = clampi(_offer + d, 5, _offer_max)
 		_offer_label.text = "$%d" % _offer)
@@ -288,7 +285,7 @@ func _step_button(text: String, d: int) -> Button:
 ## The controls while inspecting, in one small strip under the piece.
 func _build_hint() -> void:
 	_hint = PanelContainer.new()
-	_hint.add_theme_stylebox_override("panel", UiStyle.wood_box(8.0, 14))
+	_hint.add_theme_stylebox_override("panel", UiStyle.wood_box(9.0, "dark_long"))
 	_hint.anchor_left = 0.5
 	_hint.anchor_right = 0.5
 	_hint.anchor_top = 1.0
@@ -499,12 +496,7 @@ func show_haggle(item: Dictionary, ask: int, patience: int) -> void:
 	_neg_item.text = String(item["name"])
 	_neg_line.text = "Asking $%d      Your estimate $%d - $%d" % [ask, int(est.x), int(est.y)]
 	for k in _pips.size():
-		var box := StyleBoxFlat.new()
-		box.set_corner_radius_all(6)
-		box.set_border_width_all(2)
-		box.border_color = UiStyle.INK_SOFT
-		box.bg_color = UiStyle.BRASS if k < patience else Color(0, 0, 0, 0)
-		(_pips[k] as Panel).add_theme_stylebox_override("panel", box)
+		(_pips[k] as TextureRect).texture = UiStyle.ui_tex("pip_full" if k < patience else "pip_empty")
 	_offer_max = int(maxf(ask * 1.2, 50))
 	_offer = clampi(roundi(minf(ask * 0.6, est.y) / 5.0) * 5, 5, _offer_max)
 	_offer_label.text = "$%d" % _offer
@@ -546,7 +538,7 @@ func show_summary(t: String, text: String, button: String, cb: Callable) -> void
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var parts := PanelContainer.new()
-	parts.add_theme_stylebox_override("panel", UiStyle.parchment_box(28.0))
+	parts.add_theme_stylebox_override("panel", UiStyle.parchment_box(30.0, "parch_tall"))
 	parts.custom_minimum_size = Vector2(560, 0)
 	center.add_child(parts)
 	var v := VBoxContainer.new()
@@ -605,10 +597,16 @@ func _update_portrait() -> void:
 		_portrait_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		_portrait_frame.visible = false
 
+const PLAQUE_H := 44.0
 func _plaque(r: Rect2) -> void:
-	var sb := UiStyle.wood_box(0.0, 6)
-	sb.shadow_size = 6
-	draw_style_box(sb, r)
+	draw_style_box(UiStyle.wood_box(0.0, "dark_long"), r)
+
+## One of the sheet's icon plaques (calendar, coins, shelf) at the plaques' height; returns its width.
+func _icon_plaque(piece: String, at: Vector2) -> float:
+	var t := UiStyle.ui_tex(piece)
+	var w := t.get_width() * PLAQUE_H / t.get_height()
+	draw_texture_rect(t, Rect2(at, Vector2(w, PLAQUE_H)), false)
+	return w
 
 func _draw() -> void:
 	var size := get_viewport_rect().size
@@ -618,7 +616,8 @@ func _draw() -> void:
 	var rent := ("Rent due in %d days" % rent_left) if rent_left > 1 else ("Rent due tomorrow" if rent_left == 1 else "Rent due tonight")
 	var day := "DAY %d" % game.day
 	var lw := font.get_string_size(day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18)).x + font.get_string_size(rent, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13)).x + 70
-	var left := Rect2(Vector2(24, 16), Vector2(lw, 44))
+	var iw := _icon_plaque("icon_calendar", Vector2(24, 16))
+	var left := Rect2(Vector2(24 + iw + 6, 16), Vector2(lw, PLAQUE_H))
 	_plaque(left)
 	draw_string(font, left.position + Vector2(16, 31), day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.AMBER)
 	draw_string(font, left.position + Vector2(36 + font.get_string_size(day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18)).x, 28), rent, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13), UiStyle.DANGER if rent_left <= 1 else UiStyle.CREAM)
@@ -626,15 +625,22 @@ func _draw() -> void:
 	var money := "$%d" % int(round(_shown_money))
 	var sw := font.get_string_size(shelves, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13)).x
 	var mw := font.get_string_size("$00000", HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18)).x
-	var right := Rect2(Vector2(size.x - 24 - (sw + mw + 80), 16), Vector2(sw + mw + 80, 44))
-	_plaque(right)
-	draw_string(font, right.position + Vector2(16, 28), shelves, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13), UiStyle.CREAM)
-	UiStyle.icon(self, "coin", right.position + Vector2(sw + 42, 22), 20, Color(0.95, 0.8, 0.35))
-	draw_string(font, right.position + Vector2(sw + 58, 31), money, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.MONEY)
+	# right to left: the cash plaque and its coins, then the shelves plaque and its shelf
+	var cash_r := Rect2(Vector2(size.x - 24 - (mw + 32), 16), Vector2(mw + 32, PLAQUE_H))
+	_plaque(cash_r)
+	draw_string(font, cash_r.position + Vector2(16, 31), money, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.MONEY)
+	var cw := UiStyle.ui_tex("icon_coins").get_width() * PLAQUE_H / UiStyle.ui_tex("icon_coins").get_height()
+	_icon_plaque("icon_coins", Vector2(cash_r.position.x - 6 - cw, 16))
+	var shelf_r := Rect2(Vector2(cash_r.position.x - 12 - cw - (sw + 32), 16), Vector2(sw + 32, PLAQUE_H))
+	_plaque(shelf_r)
+	draw_string(font, shelf_r.position + Vector2(16, 28), shelves, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13), UiStyle.CREAM)
+	var shw := UiStyle.ui_tex("icon_shelf").get_width() * PLAQUE_H / UiStyle.ui_tex("icon_shelf").get_height()
+	_icon_plaque("icon_shelf", Vector2(shelf_r.position.x - 6 - shw, 16))
+	var right := cash_r
 	for fx: Array in _cash_fx:
 		var a := clampf(fx[1], 0.0, 1.0)
 		var d: int = fx[0]
-		draw_string(font, right.position + Vector2(sw + 58, 76 + (1.6 - fx[1]) * 20), ("%+d" % d).replace("+", "+$").replace("-", "-$"), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), Color(UiStyle.MONEY if d > 0 else UiStyle.DANGER, a))
+		draw_string(font, right.position + Vector2(16, 76 + (1.6 - fx[1]) * 20), ("%+d" % d).replace("+", "+$").replace("-", "-$"), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), Color(UiStyle.MONEY if d > 0 else UiStyle.DANGER, a))
 	# the loupe
 	if game.state == "inspect":
 		var r := 34.0
@@ -652,9 +658,7 @@ func _draw() -> void:
 		var fs := UiStyle.px(13)
 		var ts := font.get_multiline_string_size(_toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs)
 		var rr := Rect2(Vector2(size.x * 0.5 - tw * 0.5 - 14, 72), Vector2(tw + 28, ts.y + 18))
-		var sb := UiStyle.parchment_box(0.0)
-		sb.bg_color = Color(UiStyle.PARCH, 0.96 * fade)
-		sb.border_color = Color(sb.border_color, fade)
-		sb.shadow_color = Color(0, 0, 0, 0.35 * fade)
+		var sb := UiStyle.parchment_box(0.0, "parch_strip")
+		sb.modulate_color = Color(1, 1, 1, fade)
 		draw_style_box(sb, rr)
 		draw_multiline_string(font, Vector2(rr.position.x + 14, rr.position.y + 9 + font.get_ascent(fs)), _toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs, -1, Color(UiStyle.INK, fade))
