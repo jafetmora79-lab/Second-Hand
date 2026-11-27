@@ -142,7 +142,7 @@ func _build_speech() -> void:
 	_speech_text.fit_content = true
 	_speech_text.scroll_active = false
 	_speech_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_speech_text.custom_minimum_size = Vector2(SPEECH_W - 170.0, 0)
+	_speech_text.custom_minimum_size = Vector2(260.0, 0)        ## grows with the box; the box narrows on small screens
 	_speech_text.custom_effects = [_hop]
 	_speech_text.add_theme_font_override("normal_font", UiStyle.ui_font())
 	_speech_text.add_theme_font_size_override("normal_font_size", UiStyle.px(18))
@@ -562,9 +562,15 @@ func show_summary(t: String, text: String, button: String, cb: Callable) -> void
 
 func _process(delta: float) -> void:
 	# the speech box moves left, out from under the notes or negotiation card while one is open, and back when it closes
-	var side := -610.0 if (_inspect.visible or _haggle.visible) else -SPEECH_W * 0.5
+	# and never runs under the column of buttons on the right: it slides left of them, and narrows if the screen is too small
+	var vw := get_viewport_rect().size.x
+	var limit := vw - 24.0                                         ## the furthest right its edge may go
+	if _actions.get_child_count() > 0:
+		limit = vw + _actions.offset_left - 18.0
+	var w := minf(SPEECH_W, limit - 24.0)
+	var side := -vw * 0.5 + 24.0 if (_inspect.visible or _haggle.visible) else minf(-w * 0.5, limit - vw * 0.5 - w)
 	_speech.offset_left = lerpf(_speech.offset_left, side, clampf(delta * 10.0, 0.0, 1.0))
-	_speech.offset_right = _speech.offset_left + SPEECH_W
+	_speech.offset_right = _speech.offset_left + w
 	_update_portrait()
 	_toast_t = maxf(0.0, _toast_t - delta)
 	for fx: Array in _cash_fx:
@@ -598,6 +604,11 @@ func _update_portrait() -> void:
 		_portrait_frame.visible = false
 
 const PLAQUE_H := 44.0
+
+## The baseline that puts a line of text in the middle of a plaque, up and down (a hair high: the plaque's frame is deeper at the bottom).
+static func _mid_y(font: Font, r: Rect2, size: int) -> float:
+	var fs := UiStyle.px(size)
+	return r.position.y + (r.size.y + font.get_ascent(fs) - font.get_descent(fs)) * 0.5 - 1.0
 func _plaque(r: Rect2) -> void:
 	draw_style_box(UiStyle.wood_box(0.0, "dark_long"), r)
 
@@ -615,12 +626,15 @@ func _draw() -> void:
 	var rent_left: int = game.RENT_DAY - game.day
 	var rent := ("Rent due in %d days" % rent_left) if rent_left > 1 else ("Rent due tomorrow" if rent_left == 1 else "Rent due tonight")
 	var day := "DAY %d" % game.day
-	var lw := font.get_string_size(day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18)).x + font.get_string_size(rent, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13)).x + 70
+	var dw := font.get_string_size(day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18)).x
+	var rw := font.get_string_size(rent, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13)).x
+	var lw := dw + rw + 18 + 44
 	var iw := _icon_plaque("icon_calendar", Vector2(24, 16))
 	var left := Rect2(Vector2(24 + iw + 6, 16), Vector2(lw, PLAQUE_H))
 	_plaque(left)
-	draw_string(font, left.position + Vector2(16, 31), day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.AMBER)
-	draw_string(font, left.position + Vector2(36 + font.get_string_size(day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18)).x, 28), rent, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13), UiStyle.DANGER if rent_left <= 1 else UiStyle.CREAM)
+	var x0 := left.position.x + (left.size.x - (dw + 18 + rw)) * 0.5
+	draw_string(font, Vector2(x0, _mid_y(font, left, 18)), day, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.AMBER)
+	draw_string(font, Vector2(x0 + dw + 18, _mid_y(font, left, 13)), rent, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13), UiStyle.DANGER if rent_left <= 1 else UiStyle.CREAM)
 	var shelves := "On the shelves: %d" % game.stock.size()
 	var money := "$%d" % int(round(_shown_money))
 	var sw := font.get_string_size(shelves, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13)).x
@@ -628,19 +642,19 @@ func _draw() -> void:
 	# right to left: the cash plaque and its coins, then the shelves plaque and its shelf
 	var cash_r := Rect2(Vector2(size.x - 24 - (mw + 32), 16), Vector2(mw + 32, PLAQUE_H))
 	_plaque(cash_r)
-	draw_string(font, cash_r.position + Vector2(16, 31), money, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), UiStyle.MONEY)
+	draw_string(font, Vector2(cash_r.position.x, _mid_y(font, cash_r, 18)), money, HORIZONTAL_ALIGNMENT_CENTER, cash_r.size.x, UiStyle.px(18), UiStyle.MONEY)
 	var cw := UiStyle.ui_tex("icon_coins").get_width() * PLAQUE_H / UiStyle.ui_tex("icon_coins").get_height()
 	_icon_plaque("icon_coins", Vector2(cash_r.position.x - 6 - cw, 16))
 	var shelf_r := Rect2(Vector2(cash_r.position.x - 12 - cw - (sw + 32), 16), Vector2(sw + 32, PLAQUE_H))
 	_plaque(shelf_r)
-	draw_string(font, shelf_r.position + Vector2(16, 28), shelves, HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13), UiStyle.CREAM)
+	draw_string(font, Vector2(shelf_r.position.x, _mid_y(font, shelf_r, 13)), shelves, HORIZONTAL_ALIGNMENT_CENTER, shelf_r.size.x, UiStyle.px(13), UiStyle.CREAM)
 	var shw := UiStyle.ui_tex("icon_shelf").get_width() * PLAQUE_H / UiStyle.ui_tex("icon_shelf").get_height()
 	_icon_plaque("icon_shelf", Vector2(shelf_r.position.x - 6 - shw, 16))
 	var right := cash_r
 	for fx: Array in _cash_fx:
 		var a := clampf(fx[1], 0.0, 1.0)
 		var d: int = fx[0]
-		draw_string(font, right.position + Vector2(16, 76 + (1.6 - fx[1]) * 20), ("%+d" % d).replace("+", "+$").replace("-", "-$"), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), Color(UiStyle.MONEY if d > 0 else UiStyle.DANGER, a))
+		draw_string(font, right.position + Vector2(18, 76 + (1.6 - fx[1]) * 20), ("%+d" % d).replace("+", "+$").replace("-", "-$"), HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(18), Color(UiStyle.MONEY if d > 0 else UiStyle.DANGER, a))
 	# the loupe
 	if game.state == "inspect":
 		var r := 34.0
