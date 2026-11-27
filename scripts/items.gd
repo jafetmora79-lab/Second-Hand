@@ -183,3 +183,12 @@ static func estimate(item: Dictionary) -> Vector2:
 		return Vector2(float(k["fake_value"]) * 0.7, float(k["fake_value"]) * 1.3)
 	var spread := maxf(0.75 * pow(0.62, float(n_found)), 0.18)
 	return Vector2(known * (1.0 - spread), known * (1.0 + spread * 1.6))
+
+## True if the player has found the tell that gives away a copy (so offering it as genuine is knowing).
+static func known_fake(it: Dictionary) -> bool:
+	if not it.get("fake", false):
+		return false
+	for c: Dictionary in it["clues"]:
+		if c.get("fake", false) and c["id"] in it["found"]:
+			return true
+	return false

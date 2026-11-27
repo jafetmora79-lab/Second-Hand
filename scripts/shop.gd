@@ -90,7 +90,9 @@ static func build(root: Node3D) -> Dictionary:
 	var case_spots := _glass_counter(shop)
 	_box(shop, Vector3(0, COUNTER_TOP + 0.006, MAT.z), Vector3(0.62, 0.01, 0.42), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
 	# the warm light on the mat, from your right so nothing stands between you and the customer; a wall lantern by the window
-	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.75), 0.36, 0.0)
+	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.72), 0.36, -PI * 0.5)       ## plate on the back wall beside the window
+	for side: float in [-1.0, 1.0]:                                                     ## one on each side wall, by the counter
+		_prop(shop, "shop/HK_lantern", Vector3(side * 2.7, 1.85, -0.55), 0.4, 0.0 if side < 0.0 else PI)
 	var lamp := SpotLight3D.new()
 	lamp.position = Vector3(0.3, COUNTER_TOP + 0.5, MAT.z + 0.05)
 	lamp.rotation = Vector3(-PI * 0.5, 0, 0.45)
@@ -106,7 +108,10 @@ static func build(root: Node3D) -> Dictionary:
 	room_light.light_energy = 1.0
 	room_light.light_color = Color(1.0, 0.82, 0.6)
 	shop.add_child(room_light)
-	_prop(shop, "shop/HK_lantern", Vector3(0, 2.2, -1.8), 0.4, 0.0)          ## hanging from the middle beam
+	# strings of warm bulbs slung under the beams (Timberline's string lights), in place of a lantern hanging in mid-air
+	for z: float in [-3.0, -1.5]:
+		for x: float in [-2.0, 0.0, 2.0]:
+			_prop(shop, "shop/HK_string_lights", Vector3(x, 2.4, z), 0.0, 0.0, 1, Vector3(1.9, 0.0, 0.0))
 	# glass in the shop window: you see the town through it (Outside builds the view), cold light coming in
 	var glass := _mat(Color(0.8, 0.88, 0.95, 0.05), 0.05)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -125,8 +130,22 @@ static func build(root: Node3D) -> Dictionary:
 	shop.add_child(hinge)
 	if _kit(hinge, "HK_door_shop", Vector3(DOOR_W * 0.5, 0, 0), 0.0, Vector3(DOOR_W, DOOR_H, 0.08)) == null:
 		_box(hinge, Vector3(DOOR_W * 0.5, DOOR_H * 0.5, 0), Vector3(DOOR_W, DOOR_H, 0.06), _mat(Color(0.33, 0.2, 0.12)))
-	for side: float in [1.0, -1.0]:                           ## the OPEN sign hanging in the door's window, readable inside and out
-		_prop(hinge, "shop/HK_open_sign", Vector3(DOOR_W * 0.5, 1.48, side * 0.055), 0.24, 0.0 if side > 0.0 else PI)
+	# the OPEN sign hanging in the door's window, facing the street (from inside you see its back); it lights up while the shop is open
+	var sign := _prop(hinge, "shop/HK_open_sign", Vector3(DOOR_W * 0.5, 1.48, -0.055), 0.24, PI)
+	if sign != null:
+		for mi in sign.find_children("*", "MeshInstance3D", true, false):
+			var m := mi as MeshInstance3D
+			var base := m.get_active_material(0) as StandardMaterial3D
+			if base != null:
+				m.material_override = base.duplicate()          ## its own copy, so switching it off dims only this sign
+		var glow := OmniLight3D.new()                         ## the neon's red glow on the porch while the shop is open
+		glow.name = "Glow"
+		glow.light_color = Color(1.0, 0.25, 0.2)
+		glow.omni_range = 1.4
+		glow.light_energy = 0.7
+		glow.light_cull_mask = 2
+		glow.position = Vector3(0, 0.1, -0.3)
+		sign.add_child(glow)
 	var buzzer := _box(shop, Vector3(DOOR.x + DOOR_W * 0.5 + 0.2, 1.2, -3.88), Vector3(0.1, 0.16, 0.04), _mat(Color(0.2, 0.2, 0.22), 0.5, 0.5))   ## the lock box
 	var lock_led := _box(buzzer, Vector3(0, 0.05, 0.025), Vector3(0.025, 0.025, 0.01), _mat(Color(0.9, 0.1, 0.08)))
 	(lock_led.material_override as StandardMaterial3D).emission_enabled = true
@@ -161,7 +180,37 @@ static func build(root: Node3D) -> Dictionary:
 	we.environment = env
 	root.add_child(we)
 	_dress(shop)
-	return {"node": shop, "shelves": shelves, "decor": case_spots, "lamp": lamp, "door": hinge, "lock_led": lock_led}
+	return {"node": shop, "shelves": shelves, "decor": case_spots, "lamp": lamp, "door": hinge, "lock_led": lock_led, "sign": sign}
+
+## The OPEN sign's glow, 0 (switched off: a dull board) to 1 (lit).
+static func set_sign(sign: Node3D, k: float) -> void:
+	if sign == null:
+		return
+	for mi in sign.find_children("*", "MeshInstance3D", true, false):
+		var mat := (mi as MeshInstance3D).material_override as StandardMaterial3D
+		if mat != null:
+			mat.albedo_color = Color(0.3, 0.3, 0.33).lerp(Color.WHITE, k)
+	var glow := sign.get_node_or_null("Glow") as OmniLight3D
+	if glow != null:
+		glow.light_energy = 0.7 * k
+
+## The lights inside the shop (on layer 1), turned down to `k` of their full strength: closing time.
+static func set_room_lights(shop_node: Node3D, k: float) -> void:
+	for l in shop_node.find_children("*", "Light3D", true, false):
+		var light := l as Light3D
+		if light.light_cull_mask & 1 == 0 or light.has_meta("outdoor"):
+			continue                                         ## the porch lamp outside stays on
+		if not light.has_meta("full"):
+			light.set_meta("full", light.light_energy)
+		light.light_energy = float(light.get_meta("full")) * k
+
+## While the camera is outside (the day's opening and closing shots), the outdoor lights also light the shop's own walls.
+static func light_front(shop_node: Node3D, on: bool) -> void:
+	for l in shop_node.find_children("*", "Light3D", true, false):
+		var light := l as Light3D
+		if light.has_meta("outdoor") or (light.light_cull_mask & 2 != 0 and light.light_cull_mask != 0xFFFFF):
+			light.set_meta("outdoor", true)
+			light.light_cull_mask = (light.light_cull_mask | 1) if on else (light.light_cull_mask & ~1)
 
 ## Loads a model from assets/<file>.glb, scales it to `h` tall (or into `fit_box` when given), stands it on the floor at `pos`, turned `yaw`.
 ## The heights of the four shelves in the shelving unit when it stands 2.3 m tall (measured off the model).
@@ -257,6 +306,12 @@ static func _prop(root: Node3D, file: String, pos: Vector3, h: float, yaw: float
 static func _dress(shop: Node3D) -> void:
 	_prop(shop, "shop/HK_barrel_crate", Vector3(2.15, 0, -1.25), 0.8, 0.4)
 	_prop(shop, "shop/TOOL_axe", Vector3(2.85, 0, -0.55), 0.85, 0.3)
+	# a pitched roof like the town's cabins (Timberline's roof section and log gables), sitting on the walls; the plank ceiling hides it inside
+	var span := 6.0
+	var rise := span * 0.38
+	_kit_layer(shop, "HK_roof_section", Vector3(0, 2.62, -1.5), PI * 0.5, Vector3(span, rise, 6.8), 2)
+	for gs: float in [-1.0, 1.0]:
+		_kit_layer(shop, "HK_gable", Vector3(gs * 3.02, 2.64, -1.5), gs * PI * 0.5, Vector3(span - 0.12, rise - 0.02, 0.4), 2)
 	# outside the door
 	_kit_layer(shop, "HK_porch", Vector3(DOOR.x, -0.2, -5.25), PI, Vector3(2.6, 2.75, 2.3), 2)      ## a covered porch at the door, its deck level with the floor
 	_prop(shop, "shop/HK_mailbox", Vector3(DOOR.x - 1.0, 0, -4.7), 1.1, PI, 2)

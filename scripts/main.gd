@@ -16,6 +16,11 @@ const STREET := Vector3(12.0, 0, -7.6)     ## where they come from and go back t
 const LANE := Vector3(-2.2, 0, -7.6)       ## the lane in front of the door; callers walk along it past the window
 const WALK_SPEED := 1.4                    ## metres a second along the lane
 const INSIDE := Vector3(-2.2, 0, -3.3)     ## just inside the door
+## The way through the shop between the door and the counter: from just inside the door, along the aisle, then straight up to the
+## counter (and the same in reverse), so nobody slides sideways across the room.
+const ROUTE_IN := [Vector3(-1.6, 0, -3.0), Vector3(-0.3, 0, -2.35), Vector3(0.0, 0, -1.95)]
+const ROUTE_OUT := [Vector3(-0.3, 0, -2.35), Vector3(-1.6, 0, -3.0)]
+const TURN_TIME := 0.3                     ## seconds to turn toward the next leg of a walk
 
 const DEFAULT_SEED := 2026
 var rng := RandomNumberGenerator.new()     ## everything that decides the game: who comes, what they bring, prices, robberies
@@ -60,7 +65,16 @@ var want_q := Quaternion.IDENTITY          ## where the held object is turning t
 var rest_q := Quaternion.IDENTITY          ## how it lay on the mat, for "Reset"
 const REST_H := 0.15                       ## the object's centre above the mat while it lies there
 const HELD_H := 0.3                        ## ...and while you hold it up to look: clear of the mat however you turn it
-var day_log := {"bought": 0, "sold": 0, "spent": 0, "earned": 0}
+var day_log := {"bought": 0, "sold": 0, "spent": 0, "earned": 0, "profit": 0, "robbed": 0}
+var week_profit := 0                       ## realised profit all week: what sold pieces fetched, less what you paid for them
+## The town's opinion of the shop, 0..100 (starts at 50). Each kind of thing counts once per encounter: a fair purchase +2,
+## a lowball -4, turning away someone with a clean record -2, knowingly offering a copy as genuine -8. Buyers pay a little more
+## or less for it; a good name at the end of the week is the best ending.
+const STANDING_START := 50
+const STANDING_GOOD := 70                  ## rent paid and at least this: "A Place in Town"
+var standing := STANDING_START
+const RENT_DAY_PIECES := 4                 ## how many pieces each rent-day buyer will take
+var ending := ""                           ## set on rent day: "A Place in Town", "Open for Business" or "The Last Customer"
 var shelf_slots: Array = []
 var rep := {}                              ## what the shop remembers about each caller: {"visits", "fakes", "robbed"}
 var feed: SubViewport                      ## the porch camera
@@ -103,7 +117,13 @@ func _ready() -> void:
 	ui = ShopUi.new()
 	ui.game = self
 	layer.add_child(ui)
-	_start_day()
+	cine_cam = Camera3D.new()
+	cine_cam.fov = 50.0
+	add_child(cine_cam)
+	if cinematics:
+		_open_day()
+	else:
+		_start_day()
 
 ## --seed=N among the user arguments (godot ... -- --seed=N) picks the run; otherwise DEFAULT_SEED.
 func _seed_from_args() -> int:
@@ -123,7 +143,7 @@ func _shuffle(a: Array) -> void:
 # ---- the day -----------------------------------------------------------------------------------------------------------------------
 
 func _start_day() -> void:
-	day_log = {"bought": 0, "sold": 0, "spent": 0, "earned": 0}
+	day_log = {"bought": 0, "sold": 0, "spent": 0, "earned": 0, "profit": 0, "robbed": 0}
 	queue.clear()
 	var sellers := ["trapper", "widow", "kid", "collector", "drifter"]
 	_shuffle(sellers)
@@ -140,9 +160,12 @@ func _start_day() -> void:
 	if day >= 1:
 		var b: String = ["collector_b", "decorator"][day % 2]
 		queue.insert(mini(2, queue.size()), {"type": "buyer", "id": b})
-		if day >= 3:
+		if day >= 2 and day < RENT_DAY:
 			queue.append({"type": "buyer", "id": ["collector_b", "decorator"][(day + 1) % 2]})
-	if day >= 2 and rng.randf() < 0.55:                 ## from day 2, trouble: a masked man, or the stranger turned bad
+		if day == RENT_DAY:                               ## rent day: both buyers, last, each willing to take several pieces
+			queue.append({"type": "buyer", "id": "collector_b", "many": true})
+			queue.append({"type": "buyer", "id": "decorator", "many": true})
+	if day >= 2 and rng.randf() < 0.4:                 ## from day 2, trouble: a masked man, or the stranger turned bad
 		queue.insert(rng.randi_range(1, queue.size()), {"type": "robber", "id": "robber" if rng.randf() < 0.6 else "drifter"})
 	ui.show_day_title("Day %d" % day, "Rent of $%d due on day %d" % [RENT, RENT_DAY] if day < RENT_DAY else "Rent is due tonight: $%d" % RENT)
 	state = "idle"
@@ -157,6 +180,10 @@ func _next_visitor() -> void:
 		return
 	_set_time(0.85 * float(day_total - queue.size()) / float(day_total), 4.0)      ## the day wears on with each caller; dusk by the last
 	visitor = queue.pop_front()
+	if visitor["type"] == "buyer" and not visitor.get("many", false) and not _wants_any(visitor["id"]):
+		var other := "decorator" if visitor["id"] == "collector_b" else "collector_b"
+		if _wants_any(other):
+			visitor["id"] = other
 	var info: Dictionary
 	match String(visitor["type"]):
 		"seller":
@@ -182,6 +209,46 @@ func _next_visitor() -> void:
 	tw.tween_callback(func() -> void: f0.look_at(PORCH + Vector3(0, 0, 0.001), Vector3.UP, true))
 	tw.tween_property(figure, "position", PORCH, LANE.distance_to(PORCH) / WALK_SPEED)
 	tw.tween_callback(_at_door)
+
+## Adds to `tw` a walk for `f` from `from` through `pts` at `speed`, turning to face each leg as it starts. Returns the last point.
+func _walk(tw: Tween, f: Node3D, from: Vector3, pts: Array, speed: float) -> Vector3:
+	var at := from
+	for p: Vector3 in pts:
+		var d := p - at
+		if d.length() < 0.01:
+			continue
+		var yaw := atan2(d.x, d.z)                       ## the figures face +Z
+		tw.tween_callback(func() -> void: _turn(f, yaw))
+		tw.tween_property(f, "position", p, d.length() / speed)
+		at = p
+	return at
+
+## Turns a figure to `yaw` over TURN_TIME, the short way round.
+func _turn(f: Node3D, yaw: float) -> void:
+	if not is_instance_valid(f):
+		return
+	var y0 := f.rotation.y
+	var tw := create_tween()
+	tw.tween_method(func(t: float) -> void:
+		if is_instance_valid(f):
+			f.rotation = Vector3(0, lerp_angle(y0, yaw, t), 0), 0.0, 1.0, TURN_TIME).set_trans(Tween.TRANS_SINE)
+
+## True if the buyer `id` collects anything on the shelves right now.
+func _wants_any(id: String) -> bool:
+	var wanted: Array = People.BUYERS[id]["want"]
+	for st: Dictionary in stock:
+		if st["item"]["cat"] in wanted:
+			return true
+	return false
+
+## The town's opinion moves, once per encounter for each kind of reason (`why`).
+func _standing(delta: int, why: String) -> void:
+	var done: Array = visitor.get("standing", [])
+	if why in done:
+		return
+	done.append(why)
+	visitor["standing"] = done
+	standing = clampi(standing + delta, 0, 100)
 
 ## Moves the light outside toward a time of day (0 morning, 1/3 midday, 2/3 sunset, 1 night) over `secs`.
 func _set_time(t: float, secs: float) -> void:
@@ -258,10 +325,8 @@ func buzz_in() -> void:
 	tw.tween_property(f, "position", Vector3(PORCH.x, 0, -4.0), 1.2)
 	tw.tween_callback(func() -> void: People.set_layers(f, 1))
 	tw.tween_property(f, "position", INSIDE, 0.6)
-	tw.tween_callback(func() -> void:
-		_door(false)
-		f.look_at(Shop.CUSTOMER_SPOT + Vector3(0, 0, 0.01), Vector3.UP, true))
-	tw.tween_property(f, "position", Shop.CUSTOMER_SPOT, 1.8).set_trans(Tween.TRANS_SINE)
+	tw.tween_callback(func() -> void: _door(false))
+	_walk(tw, f, INSIDE, ROUTE_IN + [Shop.CUSTOMER_SPOT], WALK_SPEED)      ## along the aisle, then straight up to the counter
 	tw.tween_callback(_arrived)
 
 func turn_away() -> void:
@@ -270,6 +335,10 @@ func turn_away() -> void:
 	_aim_at(Vector3.ZERO)
 	ui.hide_feed()
 	ui.say("", "You leave the door locked. After a moment they turn and trudge off up the lane.")
+	ui.fade_speech(3.5)
+	var r: Dictionary = rep.get(String(visitor["id"]), {})
+	if visitor["type"] != "robber" and int(r.get("robbed", 0)) == 0 and int(r.get("fakes", 0)) == 0:
+		_standing(-2, "refused")
 	state = "walking"
 	var f := figure
 	People.play(f, "walk")
@@ -387,6 +456,8 @@ func _arrived() -> void:
 		_say(info["name"], "%s\n\"I'd want $%d for this %s.\"" % [hello[rng.randi() % hello.size()], ask, String(item["name"]).to_lower()])
 		state = "talk"
 		ui.show_seller_actions()
+		if _free_slot() == Vector3.INF:                  ## say so before any haggling: nothing can be bought until a piece sells
+			ui.toast("Your shelves are full: you can't buy until something sells.")
 	else:
 		_buyer_arrived(info)
 
@@ -422,20 +493,17 @@ func _leave(text: String, hurry: bool = false) -> void:
 	var k := 0.5 if hurry else 1.0
 	var tw := create_tween()
 	tw.tween_interval(1.2 * k)
-	tw.tween_callback(func() -> void:
-		f.look_at(INSIDE + Vector3(0, 0, 0.001), Vector3.UP, true)
-		People.play(f, "run" if hurry else "walk"))
-	tw.tween_property(f, "position", INSIDE, 1.8 * k)
+	tw.tween_callback(func() -> void: People.play(f, "run" if hurry else "walk"))
+	_walk(tw, f, f.position, ROUTE_OUT, WALK_SPEED / k)                       ## back from the counter and along the aisle
 	tw.tween_callback(func() -> void: _door(true))
+	_walk(tw, f, ROUTE_OUT[-1], [INSIDE], WALK_SPEED / k)
 	tw.tween_interval(0.4 * k)
 	tw.tween_callback(func() -> void: People.set_layers(f, 2))
-	tw.tween_property(f, "position", PORCH, 0.9 * k)
+	_walk(tw, f, INSIDE, [PORCH], WALK_SPEED * 1.5 / k)
 	tw.tween_callback(func() -> void:
 		_door(false)
-		f.look_at(LANE + Vector3(0, 0, 0.001), Vector3.UP, true))
-	tw.tween_property(f, "position", LANE, LANE.distance_to(PORCH) / WALK_SPEED * k)
-	tw.tween_callback(func() -> void: f.look_at(STREET + Vector3(0, 0, 0.001), Vector3.UP, true))
-	tw.tween_property(f, "position", STREET, STREET.distance_to(LANE) / WALK_SPEED * k)
+		ui.fade_speech(2.0))
+	_walk(tw, f, PORCH, [LANE, STREET], WALK_SPEED / k)
 	tw.tween_callback(func() -> void:
 		f.queue_free()
 		item = {}
@@ -458,10 +526,11 @@ func _robbery(info: Dictionary) -> void:
 
 ## Give him what is in the till: he takes most of it and goes. Safe, and expensive.
 func rob_pay() -> void:
-	var take := mini(money, maxi(60, roundi(money * 0.45 / 5.0) * 5))
+	var take := mini(money, clampi(roundi(money * 0.3 / 5.0) * 5, 60, 150))      ## a bad day, not the end of the shop
 	money -= take
 	ui.cash(-take)
 	day_log["spent"] += take
+	day_log["robbed"] += take
 	_remember(visitor["id"], "robbed")
 	_leave("He stuffs $%d in his coat and is gone." % take, true)
 
@@ -483,23 +552,119 @@ func rob_alarm() -> void:
 
 func _end_day() -> void:
 	state = "day_end"
-	var rent_line := ""
+	if cinematics:
+		await _close_shot()
+	var books := "Bought %d, sold %d.\nCash out $%d, cash in $%d%s.\nProfit on what you sold: $%d.\nIn the till at closing: $%d.   On the shelves: %d piece%s worth about $%d." % [
+		day_log["bought"], day_log["sold"], day_log["spent"], day_log["earned"],
+		(" (robbed of $%d)" % day_log["robbed"]) if day_log["robbed"] > 0 else "", day_log["profit"],
+		money, stock.size(), "" if stock.size() == 1 else "s", _stock_value()]
 	if day == RENT_DAY:
-		if money >= RENT:
-			money -= RENT
-			rent_line = "You paid the rent: $%d. You kept the shop!" % RENT
-		else:
-			state = "over"
-			ui.show_summary("Closed down", "The rent was $%d and you had $%d. The landlord changed the locks." % [RENT, money], "Try again", _restart)
-			return
-	var profit: int = day_log["earned"] - day_log["spent"]
-	var text := "Bought %d, sold %d.\nSpent $%d, earned $%d.\nMoney: $%d.   Stock on the shelves: %d pieces worth about $%d.\n%s" % [day_log["bought"], day_log["sold"], day_log["spent"], day_log["earned"], money, stock.size(), _stock_value(), rent_line]
-	if day == RENT_DAY:
-		ui.show_summary("The end of the first week", text + "\n\nThis is as far as the slice goes for now.", "Play again", _restart)
+		_ending(books)
 		return
-	ui.show_summary("Closing time, day %d" % day, text + ("\nProfit today: $%d" % profit), "Open tomorrow", func() -> void:
+	ui.show_summary("Closing time, day %d" % day, books + "\nThe town's opinion of you: %s." % _standing_word(), "Open tomorrow", func() -> void:
 		day += 1
-		_start_day())
+		if cinematics:
+			ui.veil_to(1.0, 0.5).finished.connect(_open_day)
+		else:
+			_start_day())
+
+# ---- the day's opening and closing shots ---------------------------------------------------------------------------------------------
+## Closing time: from the lane, the camera pulls slowly back from the shop front, the lights inside go down, the OPEN sign flickers
+## off, and the picture fades to black. Opening time is the same in reverse at dawn: out of the dark, the sign comes on, the lights
+## come up, and the camera moves in toward the door before you're back behind the counter.
+var cinematics := true                     ## tests switch the shots off
+var cine_cam: Camera3D
+const SHOT_NEAR := [Vector3(-1.6, 1.6, -7.4), Vector3(-0.8, 1.5, -4.0)]      ## [eye, looking at]: close in on the door and window
+const SHOT_FAR := [Vector3(-2.8, 2.5, -14.5), Vector3(-0.9, 1.8, -4.0)]      ## back across the lane: the shop, pines, the peaks behind
+
+func _shot_pose(a: Array, b: Array, t: float) -> void:
+	var eye: Vector3 = (a[0] as Vector3).lerp(b[0], t)
+	var at: Vector3 = (a[1] as Vector3).lerp(b[1], t)
+	cine_cam.transform = Transform3D(Basis.looking_at(at - eye), eye)
+
+func _shot_begin() -> void:
+	ui.set_cinema(true)
+	Outside.light_front(true)
+	Shop.light_front(shop["node"], true)
+	cine_cam.current = true
+
+func _shot_end() -> void:
+	cam.current = true
+	Outside.light_front(false)
+	Shop.light_front(shop["node"], false)
+	ui.set_cinema(false)
+
+## The sign flickers, then settles at `k` (0 off, 1 on).
+func _sign_flicker(tw: Tween, k: float) -> void:
+	var sign: Node3D = shop.get("sign")
+	for v: float in [0.5, 0.05, 0.8, 0.1, k]:
+		tw.tween_callback(func() -> void: Shop.set_sign(sign, v))
+		tw.tween_interval(0.07)
+
+func _close_shot() -> void:
+	_shot_begin()
+	_shot_pose(SHOT_NEAR, SHOT_FAR, 0.0)
+	var move := create_tween()
+	move.tween_method(func(t: float) -> void: _shot_pose(SHOT_NEAR, SHOT_FAR, t), 0.0, 1.0, 5.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var beats := create_tween()
+	beats.tween_interval(1.6)
+	beats.tween_method(func(k: float) -> void: Shop.set_room_lights(shop["node"], k), 1.0, 0.15, 1.1)   ## the lights go down inside
+	_sign_flicker(beats, 0.0)
+	beats.tween_interval(0.5)
+	beats.tween_callback(func() -> void: ui.veil_to(1.0, 1.8))
+	await move.finished
+	_shot_end()
+	ui.veil_to(0.88, 0.3)                                   ## the summary reads over the dark
+
+func _open_day() -> void:
+	ui.veil_to(1.0, 0.0)
+	day_time = 0.0
+	Outside.set_time(0.0)
+	Shop.set_sign(shop.get("sign"), 0.0)
+	Shop.set_room_lights(shop["node"], 0.15)
+	_shot_begin()
+	_shot_pose(SHOT_FAR, SHOT_NEAR, 0.0)
+	var move := create_tween()
+	move.tween_method(func(t: float) -> void: _shot_pose(SHOT_FAR, SHOT_NEAR, t), 0.0, 1.0, 4.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	ui.veil_to(0.0, 1.4)
+	var beats := create_tween()
+	beats.tween_interval(1.5)
+	_sign_flicker(beats, 1.0)
+	beats.tween_method(func(k: float) -> void: Shop.set_room_lights(shop["node"], k), 0.15, 1.0, 0.8)
+	beats.tween_interval(0.5)
+	beats.tween_callback(func() -> void: ui.veil_to(1.0, 0.6))
+	await move.finished
+	_shot_end()
+	ui.veil_to(0.0, 0.6)
+	_start_day()
+
+## How the town speaks of the shop.
+func _standing_word() -> String:
+	if standing >= 80:
+		return "trusted"
+	if standing >= STANDING_GOOD:
+		return "well liked"
+	if standing >= 45:
+		return "fair"
+	if standing >= 30:
+		return "doubtful"
+	return "a crook"
+
+## Rent day's close: one of three endings.
+func _ending(books: String) -> void:
+	state = "over"
+	var week := "\n\nThis week: profit on sales $%d. The town's opinion of you: %s." % [week_profit, _standing_word()]
+	if money < RENT:
+		ending = "The Last Customer"
+		ui.show_summary("The Last Customer", "The rent was $%d and you had $%d. In the morning the landlord changes the locks, and the bell over the door rings for the last time.\n\n" % [RENT, money] + books + week, "Try again", _restart)
+		return
+	money -= RENT
+	if standing >= STANDING_GOOD:
+		ending = "A Place in Town"
+		ui.show_summary("A Place in Town", "You paid the rent: $%d, and $%d is left in the till. People stop you in the street to ask what you've found this week. Second Hand belongs to Pinecrest now.\n\n" % [RENT, money] + books + week, "Play again", _restart)
+	else:
+		ending = "Open for Business"
+		ui.show_summary("Open for Business", "You paid the rent: $%d, and $%d is left in the till. The shop stays open, for now. The town hasn't made up its mind about you.\n\n" % [RENT, money] + books + week, "Play again", _restart)
 
 func _restart() -> void:
 	get_tree().reload_current_scene()
@@ -753,6 +918,7 @@ func make_offer(offer: int) -> void:
 		_buy(ask)
 		return
 	if offer < floor_p * 0.6:
+		_standing(-4, "lowball")
 		patience -= 2
 		if patience <= 0:
 			_leave(info["leave"])
@@ -789,6 +955,8 @@ func _buy(price: int) -> void:
 		return
 	var info: Dictionary = visitor["info"]
 	money -= price
+	if not "lowball" in visitor.get("standing", []):
+		_standing(2, "fair")
 	day_log["bought"] += 1
 	day_log["spent"] += price
 	ui.cash(-price)
@@ -840,13 +1008,24 @@ func present(st: Dictionary) -> void:
 	var it: Dictionary = st["item"]
 	if it["fake"] and rng.randf() < float(info.get("eye", 1.0)):
 		state = "refused"                                ## no sale can go through while they say so and leave
+		if Items.known_fake(it):
+			_standing(-8, "fraud")                       ## you had found its tell, and offered it anyway
 		_caught_fake(it)
 		_say(info["name"], "That %s... %s" % [String(it["name"]).to_lower(), info["fake"]])
+		var seen: Array = visitor.get("seen", [])
+		seen.append(st)
+		visitor["seen"] = seen
+		if visitor.get("many", false) and not _rent_choices().is_empty():
+			get_tree().create_timer(3.0).timeout.connect(func() -> void: _offer_more("\"Show me something else.\""))
+			return                                       ## rent day: they turn that one down, not the whole shop
 		get_tree().create_timer(3.5).timeout.connect(func() -> void: _leave("Good day."))
 		return
 	visitor["deal"] = st
 	var worth := float(it["value"]) if not it["fake"] else float(it["base"])     ## a copy that fools them is priced as a plain example
-	ask = maxi(5, roundi(worth * float(info["pays"]) * rng.randf_range(0.85, 1.05) / 5.0) * 5)
+	var good_name := 1.0 + float(standing - STANDING_START) / 500.0
+	if visitor.get("many", false):
+		good_name *= 0.9                                 ## rent day: they know you need the money
+	ask = maxi(5, roundi(worth * float(info["pays"]) * good_name * rng.randf_range(0.85, 1.05) / 5.0) * 5)
 	patience = int(info["patience"])
 	_say(info["name"], "\"I'll give you $%d for the %s.\" (You paid $%d.)" % [ask, String(it["name"]).to_lower(), st["paid"]])
 	ui.show_buyer_actions(ask)
@@ -856,11 +1035,36 @@ func sell_accept() -> void:
 	money += ask
 	day_log["sold"] += 1
 	day_log["earned"] += ask
+	day_log["profit"] += ask - int(deal["paid"])
+	week_profit += ask - int(deal["paid"])
 	ui.cash(ask)
 	if deal["node"] != null and is_instance_valid(deal["node"]):
 		(deal["node"] as Node3D).queue_free()
 	stock.erase(deal)
+	visitor.erase("deal")
+	visitor["bought"] = int(visitor.get("bought", 0)) + 1
+	if visitor.get("many", false) and int(visitor.get("bought", 0)) < RENT_DAY_PIECES and not _rent_choices().is_empty():
+		_offer_more("\"Good. What else have you got?\"")
+		return
 	_leave("A pleasure doing business.")
+
+## Rent day: the buyer would look at something else, if you have it.
+func _offer_more(line: String) -> void:
+	var info: Dictionary = visitor["info"]
+	state = "sell"
+	visitor["round"] = int(visitor.get("round", 0)) + 1
+	_say(info["name"], line)
+	ui.show_present_choices(_rent_choices())
+
+## What a rent-day buyer would still look at: pieces they collect that they haven't already turned down.
+func _rent_choices() -> Array:
+	var info: Dictionary = visitor["info"]
+	var seen: Array = visitor.get("seen", [])
+	var out: Array = []
+	for st: Dictionary in stock:
+		if st["item"]["cat"] in info["want"] and not st in seen:
+			out.append(st)
+	return out
 
 func sell_push() -> void:
 	var info: Dictionary = visitor["info"]

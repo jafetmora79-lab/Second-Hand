@@ -118,6 +118,16 @@ static func build(root: Node3D) -> Node3D:
 		_place(out, "TREE_meshy_pine", Vector3(x2, 0, z2), rng.randf_range(6.0, 12.0), rng.randf() * TAU)
 	for i in 7:
 		_place(out, "PL_snowbush", Vector3(rng.randf_range(-2.0, 16.0), 0, -rng.randf_range(10.5, 22.0)), rng.randf_range(0.4, 0.8), rng.randf() * TAU)
+	# behind and beside the shop (only seen in the closing and opening shots from the lane): snow, pines, and two more peaks
+	var back := PlaneMesh.new()
+	back.size = Vector2(300, 90)
+	_mesh(out, back, Vector3(0, -0.02, 40.8), snow)                ## from the shop's front wall back; the shop's floor covers it inside
+	for p2: Vector3 in [Vector3(-6.5, 0, -2.0), Vector3(-9.0, 0, 4.0), Vector3(-5.0, 0, 9.0), Vector3(6.0, 0, -1.0), Vector3(8.5, 0, 5.5),
+			Vector3(4.0, 0, 11.0), Vector3(-1.5, 0, 14.0), Vector3(-13.0, 0, 12.0), Vector3(12.0, 0, 14.0), Vector3(-18.0, 0, 3.0),
+			Vector3(17.0, 0, 2.0), Vector3(2.5, 0, 22.0), Vector3(-8.0, 0, 24.0)]:
+		_place(out, "TREE_meshy_pine", p2, rng.randf_range(7.0, 11.0), rng.randf() * TAU)
+	_place(out, "MTN_peak_2", Vector3(-70, -2, 230), 40.0, 1.0, Vector3(3.4, 1, 2.6))
+	_place(out, "MTN_peak_1", Vector3(60, -2, 260), 46.0, 2.6, Vector3(3.4, 1, 2.6))
 	# the mountains, far off: Timberline's Meshy peaks, wide and tall enough to fill the top of the window
 	## low enough that their tops sit inside the window (from the counter it shows up to ~0.18 rad above eye level), wide like a range
 	var peaks := [
@@ -245,6 +255,11 @@ static func set_time(t: float) -> void:
 	var k := lerpf(a["snow"], b["snow"], f)
 	_snow.albedo_color = Color(0.93, 0.95, 1.0) * k
 	_lane.albedo_color = Color(0.78, 0.8, 0.86) * k
+
+## The cold outdoor light also lights the shop's walls (layer 1) while the camera is outside.
+static func light_front(on: bool) -> void:
+	if _sun != null:
+		_sun.light_cull_mask = (LAYER | 1) if on else LAYER
 
 static func time_name(t: float) -> String:
 	return String(TIMES[clampi(roundi(clampf(t, 0.0, 1.0) * 3.0), 0, 3)]["name"])

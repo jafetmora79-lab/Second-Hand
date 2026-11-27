@@ -21,6 +21,10 @@ var _speech_name: Label
 var _speech_text: RichTextLabel
 var _hop := HopText.new()                  ## letters typed in one by one, each with a little hop
 var _speech_tween: Tween
+var _speech_alpha := 1.0                   ## fades the speech box out a little after a customer has gone
+var _fade_tween: Tween
+var _veil: ColorRect
+var cinema := false                        ## the camera is outside for the day's opening or closing shot: no HUD
 var _portrait: TextureRect                 ## the speaker's face (or the porch camera)
 var _portrait_frame: PanelContainer
 var _portrait_view: SubViewport
@@ -55,6 +59,11 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST     ## the HUD sheet is pixel art: keep its edges crisp
 	theme = UiStyle.menu_theme()
+	_veil = ColorRect.new()                                 ## black, over the plaques but under every panel: the day's fades
+	_veil.color = Color(0, 0, 0, 0)
+	_veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_veil)
 	_build_speech()
 	_actions = VBoxContainer.new()
 	_actions.anchor_left = 1.0
@@ -66,6 +75,7 @@ func _ready() -> void:
 	_actions.offset_top = -176
 	_actions.offset_bottom = -26
 	_actions.grow_vertical = Control.GROW_DIRECTION_BEGIN     ## more buttons (a buyer's choices) stack upward
+	_actions.grow_horizontal = Control.GROW_DIRECTION_BEGIN   ## and a long label widens the column leftward, never off the screen
 	_actions.alignment = BoxContainer.ALIGNMENT_END
 	_actions.add_theme_constant_override("separation", 8)
 	add_child(_actions)
@@ -353,6 +363,9 @@ class Mark extends Control:
 ## A line of speech. The box rises from below the screen with a small overshoot the first time (and gives a little bounce for each new
 ## line after that); the words are typed in letter by letter, each letter hopping as it lands.
 func say(who: String, text: String) -> void:
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_speech_alpha = 1.0
 	_speech_name.text = who.to_upper()
 	_speech_text.text = "[hop]" + text.replace("[", "[lb]") + "[/hop]"
 	_hop.restart()
@@ -560,17 +573,37 @@ func show_summary(t: String, text: String, button: String, cb: Callable) -> void
 
 # ---- every frame: the portrait, the speech box's place, the plaques, the loupe, toasts ---------------------------------------------------
 
+## Leaning in on the piece folds the appraisal notes away to a slim edge at the right of the screen (and fades the speech box back), so
+## nothing covers what you are looking at; zoom out, or move the mouse onto the folded edge, and they slide back.
+const NOTES_W := 400.0
+const NOTES_PEEK := 34.0                   ## how much of the folded card stays on screen
+var _fold := 0.0                           ## 0 open .. 1 folded away
+func _fold_notes(delta: float) -> void:
+	var want := 0.0
+	if _inspect.visible and game.state == "inspect":
+		want = clampf(inverse_lerp(0.7, 0.55, float(game.zoom)), 0.0, 1.0)
+		if want > 0.0 and _inspect.get_global_rect().has_point(get_viewport().get_mouse_position()):
+			want = 0.0                                          ## the mouse is on it: you want to read it
+	_fold = lerpf(_fold, want, clampf(delta * 8.0, 0.0, 1.0))
+	var shift := _fold * (NOTES_W + 24.0 - NOTES_PEEK)
+	_inspect.offset_left = -NOTES_W - 24.0 + shift
+	_inspect.offset_right = -24.0 + shift
+	_inspect.modulate.a = 1.0 - 0.35 * _fold
+	_speech.modulate.a = _speech_alpha * (1.0 - 0.65 * _fold)
+	_hint.modulate.a = 1.0 - 0.5 * _fold
+
 func _process(delta: float) -> void:
 	# the speech box moves left, out from under the notes or negotiation card while one is open, and back when it closes
 	# and never runs under the column of buttons on the right: it slides left of them, and narrows if the screen is too small
 	var vw := get_viewport_rect().size.x
 	var limit := vw - 24.0                                         ## the furthest right its edge may go
 	if _actions.get_child_count() > 0:
-		limit = vw + _actions.offset_left - 18.0
+		limit = minf(vw + _actions.offset_left, _actions.position.x) - 18.0     ## its real left edge, if a long label widened it
 	var w := minf(SPEECH_W, limit - 24.0)
 	var side := -vw * 0.5 + 24.0 if (_inspect.visible or _haggle.visible) else minf(-w * 0.5, limit - vw * 0.5 - w)
 	_speech.offset_left = lerpf(_speech.offset_left, side, clampf(delta * 10.0, 0.0, 1.0))
 	_speech.offset_right = _speech.offset_left + w
+	_fold_notes(delta)
 	_update_portrait()
 	_toast_t = maxf(0.0, _toast_t - delta)
 	for fx: Array in _cash_fx:
@@ -619,7 +652,36 @@ func _icon_plaque(piece: String, at: Vector2) -> float:
 	draw_texture_rect(t, Rect2(at, Vector2(w, PLAQUE_H)), false)
 	return w
 
+## After `delay` seconds the speech box fades away (the customer has gone and nobody is talking).
+func fade_speech(delay: float = 2.5) -> void:
+	if not _speech.visible:
+		return
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_interval(delay)
+	_fade_tween.tween_property(self, "_speech_alpha", 0.0, 0.9).set_trans(Tween.TRANS_SINE)
+	_fade_tween.tween_callback(func() -> void:
+		_speech.visible = false
+		_speech_alpha = 1.0)
+
+## The screen fades toward black (`a` = 1) or back (`a` = 0) over `secs`.
+func veil_to(a: float, secs: float) -> Tween:
+	var tw := create_tween()
+	tw.tween_property(_veil, "color:a", a, secs).set_trans(Tween.TRANS_SINE)
+	return tw
+
+## The opening or closing shot: everything on screen is put away (or the plaques come back).
+func set_cinema(on: bool) -> void:
+	cinema = on
+	if on:
+		hide_actions()
+		_speech.visible = false
+		_tip.visible = false
+
 func _draw() -> void:
+	if cinema:
+		return
 	var size := get_viewport_rect().size
 	var font := UiStyle.ui_font()
 	# two small plaques: the day and the rent on the left, the stock and the cash on the right

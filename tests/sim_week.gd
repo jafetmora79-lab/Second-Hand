@@ -43,7 +43,8 @@ func check(ok: bool, what: String) -> void:
 
 func run_week(sd: int, pol: String) -> String:
 	var g: Node3D = (load("res://main.tscn") as PackedScene).instantiate()
-	g.seed_override = sd                 ## the game seeds itself from this in _ready, before day 1 starts
+	g.seed_override = sd
+	g.cinematics = false                 ## the game seeds itself from this in _ready, before day 1 starts
 	root.add_child(g)
 	await frames(2)
 	var bot := RandomNumberGenerator.new()
@@ -108,12 +109,13 @@ func run_week(sd: int, pol: String) -> String:
 				offer *= 1.15
 			if g.state == "haggle":
 				g.decline()
-		elif st == "sell" and not g.visitor.get("bot_deal", false):
-			g.visitor["bot_deal"] = true
+		elif st == "sell" and not g.visitor.has("deal") and g.visitor.get("bot_round", -1) != int(g.visitor.get("round", 0)):
+			g.visitor["bot_round"] = int(g.visitor.get("round", 0))      ## a rent-day buyer asks again after each sale or refusal
 			var wanted: Array = g.visitor["info"]["want"]
 			var pick: Dictionary = {}
+			var seen: Array = g.visitor.get("seen", [])
 			for s2: Dictionary in g.stock:
-				if s2["item"]["cat"] in wanted and (pick.is_empty() or int(s2["paid"]) > int(pick["paid"])):
+				if not s2 in seen and s2["item"]["cat"] in wanted and (pick.is_empty() or int(s2["paid"]) > int(pick["paid"])):
 					pick = s2
 			if pick.is_empty():
 				continue
@@ -138,8 +140,8 @@ func run_week(sd: int, pol: String) -> String:
 				spent += m2 - g.money
 		elif st == "day_end" or st == "over":
 			var d: int = g.day
-			if d == g.RENT_DAY and st == "day_end":
-				rent_paid = true
+			if st == "over":
+				rent_paid = g.ending != "The Last Customer"
 			var expect: int = g.START_MONEY + earned - spent - (g.RENT if rent_paid else 0)
 			check(g.money == expect, "seed %d %s day %d: money $%d, the books say $%d" % [sd, pol, d, g.money, expect])
 			for s3: Dictionary in g.stock:
@@ -148,9 +150,7 @@ func run_week(sd: int, pol: String) -> String:
 			check(g.pivot.get_child_count() == 0 or g.item_node == null and g.pivot.get_child_count() == 0, "something is left on the mat")
 			print("seed %d %-8s day %d  money $%4d  stock %2d  shelf value $%d" % [sd, pol, d, g.money, g.stock.size(), g._stock_value()])
 			if st == "over":
-				outcome = "The Last Customer (rent unpaid)"
-			elif d >= g.RENT_DAY:
-				outcome = "rent paid"
+				outcome = "%s (standing %d)" % [g.ending, g.standing]
 			else:
 				g.day += 1
 				g._start_day()
