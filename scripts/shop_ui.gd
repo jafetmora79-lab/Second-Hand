@@ -20,6 +20,7 @@ var _ask_label: Label
 var _offer_label: Label
 var _slider: HSlider
 var _patience: Label
+var _pips: Array = []                      ## patience as five drawn pips (the web build's font has no circle characters)
 var _summary: Control = null
 var _feed: PanelContainer                  ## the porch camera: who is at the door
 var _feed_tex: TextureRect
@@ -150,7 +151,15 @@ func _build_feed() -> void:
 	v.add_theme_constant_override("separation", 6)
 	_feed.add_child(v)
 	var head := HBoxContainer.new()
-	var rec := UiStyle.text_label("● REC", 12, UiStyle.DANGER)
+	var dot := Panel.new()                                    ## the red recording light, drawn (the web font has no circle character)
+	dot.custom_minimum_size = Vector2(9, 9)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var dot_box := StyleBoxFlat.new()
+	dot_box.set_corner_radius_all(5)
+	dot_box.bg_color = UiStyle.DANGER
+	dot.add_theme_stylebox_override("panel", dot_box)
+	head.add_child(dot)
+	var rec := UiStyle.text_label(" REC", 12, UiStyle.DANGER)
 	head.add_child(rec)
 	head.add_child(UiStyle.text_label("   PORCH CAMERA", 12, UiStyle.AMBER_DIM))
 	v.add_child(head)
@@ -243,8 +252,17 @@ func _build_haggle() -> void:
 	v.add_child(UiStyle.title_label("Haggle", 28))
 	_ask_label = UiStyle.text_label("", 20, UiStyle.CREAM)
 	v.add_child(_ask_label)
-	_patience = UiStyle.text_label("", 14, UiStyle.MUTED)
-	v.add_child(_patience)
+	var prow := HBoxContainer.new()
+	prow.add_theme_constant_override("separation", 5)
+	_patience = UiStyle.text_label("Patience", 14, UiStyle.MUTED)
+	prow.add_child(_patience)
+	for k in 5:
+		var pip := Panel.new()
+		pip.custom_minimum_size = Vector2(12, 12)
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		prow.add_child(pip)
+		_pips.append(pip)
+	v.add_child(prow)
 	v.add_child(UiStyle.text_label("YOUR OFFER", 12, UiStyle.AMBER_DIM))
 	_offer_label = UiStyle.text_label("", 30, UiStyle.MONEY)
 	_offer_label.add_theme_font_override("font", UiStyle.ui_bold())
@@ -360,7 +378,13 @@ func show_haggle(item: Dictionary, ask: int, patience: int) -> void:
 	_haggle.visible = true
 	var est := Items.estimate(item)
 	_ask_label.text = "They ask $%d\nYou think: $%d to $%d" % [ask, int(est.x), int(est.y)]
-	_patience.text = "Patience: " + "●".repeat(maxi(patience, 0)) + "○".repeat(maxi(0, 5 - patience))
+	for k in _pips.size():
+		var box := StyleBoxFlat.new()
+		box.set_corner_radius_all(6)
+		box.set_border_width_all(2)
+		box.border_color = UiStyle.AMBER
+		box.bg_color = UiStyle.AMBER if k < patience else Color(0, 0, 0, 0)
+		(_pips[k] as Panel).add_theme_stylebox_override("panel", box)
 	_slider.max_value = maxf(ask * 1.2, 50)
 	_slider.value = roundi(minf(ask * 0.6, est.y) / 5.0) * 5
 	_offer_label.text = "$%d" % int(_slider.value)

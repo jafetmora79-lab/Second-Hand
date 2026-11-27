@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://0v6pjfunjrml"
-path="res://.godot/imported/polar_bear_animated_0.png-fcc2dcfdd02f5e8475717ba3a1645a7c.ctex"
+uid="uid://dcdhxajsebdlt"
+path="res://.godot/imported/HK_open_sign_0.jpg-f44ef0b49f65ea80d886a661b5da8b8e.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "1548cac00b5e406b84881060d1f2ed09"
+"md5": "7d2f6f31de6bd744a98ad902718eb311"
 }
 
 [deps]
 
-source_file="res://assets/outside/polar_bear_animated_0.png"
-dest_files=["res://.godot/imported/polar_bear_animated_0.png-fcc2dcfdd02f5e8475717ba3a1645a7c.ctex"]
+source_file="res://assets/shop/HK_open_sign_0.jpg"
+dest_files=["res://.godot/imported/HK_open_sign_0.jpg-f44ef0b49f65ea80d886a661b5da8b8e.ctex"]
 
 [params]
 

@@ -11,8 +11,10 @@ const RENT_DAY := 7
 const LOUPE_DWELL := 0.45                  ## seconds the loupe must rest on a detail to read it
 const LOUPE_REACH := 0.032                 ## metres from a clue's spot that still counts
 const ZOOM_READ := 0.62                    ## the camera must be at least this close to read a detail
-const PORCH := Vector3(-2.2, 0, -5.6)      ## where callers wait, outside the door
-const STREET := Vector3(2.0, 0, -7.6)      ## where they come from and go back to, along the lane
+const PORCH := Vector3(-2.2, 0, -6.0)      ## where callers wait, outside the door
+const STREET := Vector3(12.0, 0, -7.6)     ## where they come from and go back to: up the lane, out of sight to the right
+const LANE := Vector3(-2.2, 0, -7.6)       ## the lane in front of the door; callers walk along it past the window
+const WALK_SPEED := 1.4                    ## metres a second along the lane
 const INSIDE := Vector3(-2.2, 0, -3.3)     ## just inside the door
 
 const DEFAULT_SEED := 2026
@@ -157,10 +159,13 @@ func _next_visitor() -> void:
 	add_child(figure)
 	People.set_layers(figure, 2)                         ## outside: lit by the cold daylight and the porch lamp
 	state = "walking"
-	figure.look_at(PORCH + Vector3(0, 0, 0.001), Vector3.UP, true)
+	figure.look_at(LANE + Vector3(0, 0, 0.001), Vector3.UP, true)
 	People.play(figure, "walk")
 	var tw := create_tween()
-	tw.tween_property(figure, "position", PORCH, 2.4)
+	var f0 := figure
+	tw.tween_property(figure, "position", LANE, STREET.distance_to(LANE) / WALK_SPEED)       ## along the lane, past the window
+	tw.tween_callback(func() -> void: f0.look_at(PORCH + Vector3(0, 0, 0.001), Vector3.UP, true))
+	tw.tween_property(figure, "position", PORCH, LANE.distance_to(PORCH) / WALK_SPEED)
 	tw.tween_callback(_at_door)
 
 ## Moves the light outside toward a time of day (0 morning, 1/3 midday, 2/3 sunset, 1 night) over `secs`.
@@ -230,7 +235,7 @@ func buzz_in() -> void:
 	f.look_at(INSIDE + Vector3(0, 0, 0.001), Vector3.UP, true)
 	var tw := create_tween()
 	tw.tween_interval(0.5)
-	tw.tween_property(f, "position", Vector3(PORCH.x, 0, -4.0), 0.6)
+	tw.tween_property(f, "position", Vector3(PORCH.x, 0, -4.0), 1.2)
 	tw.tween_callback(func() -> void: People.set_layers(f, 1))
 	tw.tween_property(f, "position", INSIDE, 0.6)
 	tw.tween_callback(func() -> void:
@@ -246,10 +251,12 @@ func turn_away() -> void:
 	state = "walking"
 	var f := figure
 	People.play(f, "walk")
-	f.look_at(STREET + Vector3(0, 0, 0.001), Vector3.UP, true)
+	f.look_at(LANE + Vector3(0, 0, 0.001), Vector3.UP, true)
 	var tw := create_tween()
 	tw.tween_interval(0.8)
-	tw.tween_property(f, "position", STREET, 2.4)
+	tw.tween_property(f, "position", LANE, LANE.distance_to(PORCH) / WALK_SPEED)
+	tw.tween_callback(func() -> void: f.look_at(STREET + Vector3(0, 0, 0.001), Vector3.UP, true))
+	tw.tween_property(f, "position", STREET, STREET.distance_to(LANE) / WALK_SPEED)
 	tw.tween_callback(func() -> void:
 		f.queue_free()
 		_next_visitor())
@@ -273,8 +280,8 @@ func _build_feed() -> void:
 	add_child(feed)
 	var c := Camera3D.new()
 	c.fov = 62.0
-	var eye := Vector3(PORCH.x + 0.6, 2.3, -4.2)
-	c.transform = Transform3D(Basis.looking_at(PORCH + Vector3(0.0, 1.0, 0) - eye), eye)
+	var eye := Vector3(PORCH.x + 0.55, 2.05, -4.25)
+	c.transform = Transform3D(Basis.looking_at(PORCH + Vector3(0.0, 0.95, 0) - eye), eye)
 	feed.add_child(c)
 	c.current = true
 
@@ -364,8 +371,10 @@ func _leave(text: String, hurry: bool = false) -> void:
 	tw.tween_property(f, "position", PORCH, 0.9 * k)
 	tw.tween_callback(func() -> void:
 		_door(false)
-		f.look_at(STREET + Vector3(0, 0, 0.001), Vector3.UP, true))
-	tw.tween_property(f, "position", STREET, 2.2 * k)
+		f.look_at(LANE + Vector3(0, 0, 0.001), Vector3.UP, true))
+	tw.tween_property(f, "position", LANE, LANE.distance_to(PORCH) / WALK_SPEED * k)
+	tw.tween_callback(func() -> void: f.look_at(STREET + Vector3(0, 0, 0.001), Vector3.UP, true))
+	tw.tween_property(f, "position", STREET, STREET.distance_to(LANE) / WALK_SPEED * k)
 	tw.tween_callback(func() -> void:
 		f.queue_free()
 		item = {}

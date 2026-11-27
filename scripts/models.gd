@@ -51,6 +51,8 @@ static func build(item: Dictionary) -> Node3D:
 		root.add_child(model)
 		_fit(model)
 		_tint(model, item.get("tint", Color.WHITE), float(item.get("gloss", -1.0)))
+		if item["kind"] == "snow_globe":
+			SnowGlobe.build(model)                               ## glass dome, a scene inside and moving snow on the Meshy base
 		var tris := _aim_clues(root, model, item["clues"])
 		if item.has("wear_seed"):
 			_wear(root, tris, int(item["wear_seed"]))

@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://d3e67y0bqygug"
-path="res://.godot/imported/polar_bear_animated.glb-cd074979b1bc8a45c8e680fd6be69c85.scn"
+uid="uid://bwh21dxupsvsx"
+path="res://.godot/imported/HK_open_sign.glb-4a764331b58639ef2f1c7c1e34250bd5.scn"
 
 [deps]
 
-source_file="res://assets/outside/polar_bear_animated.glb"
-dest_files=["res://.godot/imported/polar_bear_animated.glb-cd074979b1bc8a45c8e680fd6be69c85.scn"]
+source_file="res://assets/shop/HK_open_sign.glb"
+dest_files=["res://.godot/imported/HK_open_sign.glb-4a764331b58639ef2f1c7c1e34250bd5.scn"]
 
 [params]
 

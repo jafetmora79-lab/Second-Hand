@@ -113,6 +113,8 @@ static func build(root: Node3D) -> Dictionary:
 	shop.add_child(hinge)
 	if _kit(hinge, "HK_door_shop", Vector3(DOOR_W * 0.5, 0, 0), 0.0, Vector3(DOOR_W, DOOR_H, 0.08)) == null:
 		_box(hinge, Vector3(DOOR_W * 0.5, DOOR_H * 0.5, 0), Vector3(DOOR_W, DOOR_H, 0.06), _mat(Color(0.33, 0.2, 0.12)))
+	for side: float in [1.0, -1.0]:                           ## the OPEN sign hanging in the door's window, readable inside and out
+		_prop(hinge, "shop/HK_open_sign", Vector3(DOOR_W * 0.5, 1.48, side * 0.055), 0.24, 0.0 if side > 0.0 else PI)
 	var buzzer := _box(shop, Vector3(DOOR.x + DOOR_W * 0.5 + 0.2, 1.2, -3.88), Vector3(0.1, 0.16, 0.04), _mat(Color(0.2, 0.2, 0.22), 0.5, 0.5))   ## the lock box
 	var lock_led := _box(buzzer, Vector3(0, 0.05, 0.025), Vector3(0.025, 0.025, 0.01), _mat(Color(0.9, 0.1, 0.08)))
 	(lock_led.material_override as StandardMaterial3D).emission_enabled = true

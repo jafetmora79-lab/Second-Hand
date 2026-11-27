@@ -104,6 +104,18 @@ static func build(root: Node3D) -> Node3D:
 		var side := -1.0 if rng.randf() < 0.5 else 1.0
 		var x := absf(z) * (0.33 + side * rng.randf_range(0.1, 0.55))
 		_place(out, "TREE_meshy_pine", Vector3(x, 0, z), rng.randf_range(7.0, 13.0), rng.randf() * TAU)
+	# the rest of the town along the lane, and the forest behind it: this is what the door's window looks out on (left of the
+	# shop window's view, about x = -0.55 |z| from behind the counter)
+	_place(out, "HOUSE_aframe", Vector3(-7.5, 0, -15.0), 5.5, 0.4)
+	_place(out, "HOUSE_farmhouse", Vector3(-17.0, 0, -27.0), 7.0, -0.3)
+	_place(out, "HOUSE_cottage", Vector3(-30.0, 0, -45.0), 6.0, 0.8)
+	_place(out, "HOUSE_aframe", Vector3(6.0, 0, -24.0), 5.0, -0.5)
+	for i in 45:
+		var z2 := -rng.randf_range(11.0, 110.0)
+		var x2 := -absf(z2) * rng.randf_range(0.25, 1.1) - 2.5
+		if Vector2(x2, z2).distance_to(Vector2(-7.5, -15.0)) < 5.0 or Vector2(x2, z2).distance_to(Vector2(-17.0, -27.0)) < 7.0:
+			continue                                             ## leave the houses their gardens
+		_place(out, "TREE_meshy_pine", Vector3(x2, 0, z2), rng.randf_range(6.0, 12.0), rng.randf() * TAU)
 	for i in 7:
 		_place(out, "PL_snowbush", Vector3(rng.randf_range(-2.0, 16.0), 0, -rng.randf_range(10.5, 22.0)), rng.randf_range(0.4, 0.8), rng.randf() * TAU)
 	# the mountains, far off: Timberline's Meshy peaks, wide and tall enough to fill the top of the window
@@ -213,7 +225,8 @@ const ANIMALS := [
 	["ANI_rabbit", 0.35, 2.2, false],
 	["ANI_rabbit", 0.3, 1.8, false],
 	["wolf_standing", 0.85, 1.6, false],
-	["polar_bear_animated", 1.3, 1.1, false],
+	["ANI_deer", 1.3, 1.5, false],
+	["wolf_standing", 0.75, 1.9, false],
 	["ANI_raven", 0.35, 4.5, true],
 ]
 

@@ -40,13 +40,13 @@ func run() -> void:
 	# a day in the shop
 	var g: Node3D = (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(g)
-	if not await wait_state(g, "at_door", 12.0):
+	if not await wait_state(g, "at_door", 30.0):
 		fails += 1
 		print("FAIL: nobody rang at the door (state ", g.state, ")")
 	else:
 		print("at the door: ", g.visitor["id"], "  memory: ", g._memory(g.visitor["id"]))
 		g.buzz_in()
-	if not await wait_state(g, "talk", 8.0) or g.item.is_empty():
+	if not await wait_state(g, "talk", 12.0) or g.item.is_empty():
 		fails += 1
 		print("FAIL: no seller at the counter (state ", g.state, ")")
 	else:
@@ -73,7 +73,7 @@ func run() -> void:
 			fails += 1
 			print("FAIL: the shop did not remember the visit: ", g._memory(g.visitor["id"]))
 	# a robbery: next caller is the masked man
-	if not await wait_state(g, "at_door", 15.0):
+	if not await wait_state(g, "at_door", 40.0):
 		fails += 1
 		print("FAIL: the next caller never rang (state ", g.state, ")")
 	else:
@@ -84,9 +84,9 @@ func run() -> void:
 		g.queue.push_front(g.visitor)
 		g.figure = null
 		g._next_visitor()
-		await wait_state(g, "at_door", 8.0)
+		await wait_state(g, "at_door", 30.0)
 		g.buzz_in()
-		if not await wait_state(g, "robbery", 8.0):
+		if not await wait_state(g, "robbery", 12.0):
 			fails += 1
 			print("FAIL: the robber did not hold up the shop (state ", g.state, ")")
 		else:

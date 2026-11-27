@@ -17,7 +17,7 @@ func snap(n: String) -> void:
 func run() -> void:
 	var g: Node3D = (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(g)
-	await wait_state(g, "at_door", 15.0)
+	await wait_state(g, "at_door", 30.0)
 	await wait(0.6)
 	await snap("d_door")
 	var keep: Transform3D = g.cam.transform
