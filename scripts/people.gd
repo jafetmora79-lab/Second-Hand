@@ -141,6 +141,11 @@ static func play(figure: Node, what: String) -> bool:
 					player.set_meta("gesture", turn)
 					player.get_tree().create_timer(minf(a.length, GESTURE)).timeout.connect(func() -> void:
 						if is_instance_valid(player) and player.get_meta("gesture", 0) == turn and player.assigned_animation == n:
+							for other in player.get_animation_list():     ## back to standing idle when the model has one
+								if String(other).to_lower().contains("idle"):
+									player.get_animation(other).loop_mode = Animation.LOOP_LINEAR
+									player.play(other, 0.5)
+									return
 							player.play(n, 0.5)
 							player.seek(0.0, true)
 							player.pause())
