@@ -36,6 +36,14 @@ func run() -> void:
 	var fails := 0
 	var checked := 0
 	var rng := RandomNumberGenerator.new()
+	for kind0: String in Items.KINDS:                        ## exactly one maker's mark per kind: a second id in MARK_IDS would be taken for one
+		var marks := 0
+		for c0: Dictionary in Items.KINDS[kind0]["clues"]:
+			if String(c0["id"]) in Items.MARK_IDS:
+				marks += 1
+		if marks != 1:
+			fails += 1
+			print("FAIL: %s has %d clues with a maker's-mark id" % [kind0, marks])
 	for kind: String in Items.KINDS:
 		for v in 5:
 			# a version of this kind with every damage clue present

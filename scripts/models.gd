@@ -46,6 +46,7 @@ static func build(item: Dictionary) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Item"
 	var path := "res://assets/items/%s.glb" % item["kind"]
+	var tris := PackedVector3Array()
 	if ResourceLoader.exists(path):
 		var model := (load(path) as PackedScene).instantiate() as Node3D
 		root.add_child(model)
@@ -53,13 +54,13 @@ static func build(item: Dictionary) -> Node3D:
 		_tint(model, item.get("tint", Color.WHITE), float(item.get("gloss", -1.0)))
 		if item["kind"] == "snow_globe":
 			SnowGlobe.build(model)                               ## glass dome, a scene inside and moving snow on the Meshy base
-		var tris := _aim_clues(root, model, item["clues"])
+		tris = _aim_clues(root, model, item["clues"])
 		if item.has("wear_seed"):
 			_wear(root, tris, int(item["wear_seed"]))
 	else:
 		_stand_in(root, String(item["kind"]))
 	for c: Dictionary in item["clues"]:
-		_draw_clue(root, c)
+		_draw_clue(root, c, tris)
 	var body := StaticBody3D.new()
 	body.name = "Hit"
 	for mi in root.find_children("*", "MeshInstance3D", true, false):
@@ -222,17 +223,6 @@ static func _stand_in(root: Node3D, kind: String) -> void:
 			_part(root, _cyl(0.025, 0.04, 0.06), Vector3(0, 0.09, 0), _mat(Color(0.42, 0.26, 0.14), 0.5))
 			_part(root, _cyl(0.014, 0.014, 0.02), Vector3(0, 0.13, 0), pale)
 
-## How a mark is made, so a printed copy looks different from the struck original even before you read it:
-## colour of the letters and whether they have depth (a lighter offset copy behind them, as if pressed into the surface).
-const INKS := {
-	"struck": [Color(0.2, 0.13, 0.08, 0.92), true],
-	"carved": [Color(0.24, 0.14, 0.07, 0.95), true],
-	"engraved": [Color(0.14, 0.13, 0.12, 0.92), true],
-	"embossed": [Color(0.22, 0.16, 0.1, 0.9), true],
-	"printed": [Color(0.02, 0.02, 0.02, 1.0), false],
-	"blue": [Color(0.14, 0.24, 0.6, 0.88), false],
-}
-
 ## A frame on the surface at a clue: z out of the surface, x and y along it.
 static func _frame(n: Vector3) -> Basis:
 	var up := Vector3(0, 0, -1) if absf(n.y) > 0.9 else Vector3.UP
@@ -240,45 +230,15 @@ static func _frame(n: Vector3) -> Basis:
 	var y := n.cross(x).normalized()
 	return Basis(x, y, n)
 
-## Draws a clue on the object: a mark as text in its ink, damage as cracks, and a copy's tell as the physical part that gives it away.
-static func _draw_clue(root: Node3D, c: Dictionary) -> void:
+## Draws a clue on the object: a maker's mark, sticker or stamp as its own artwork laid on the surface (scripts/marks.gd), and damage or
+## a copy's tell as the physical part that shows it.
+static func _draw_clue(root: Node3D, c: Dictionary, tris: PackedVector3Array = PackedVector3Array()) -> void:
 	var pos: Vector3 = c["pos"]
 	var n: Vector3 = c.get("normal", Vector3(0, 0, 1))
-	if c.has("label"):
-		var ink: Array = INKS.get(String(c.get("ink", "struck")), INKS["struck"])
-		if ink[1]:                                                 ## pressed in: a pale edge just below and to the side
-			var edge := _label(String(c["label"]), Color(0.85, 0.78, 0.62, 0.5), n)
-			edge.position = pos + n * 0.0035 + _frame(n) * Vector3(0.0003, -0.0003, 0)
-			root.add_child(edge)
-		var l := _label(String(c["label"]), ink[0], n)
-		l.position = pos + n * 0.004                          ## a hair off the surface, so curved cases and lens rims don't swallow the letters
-		root.add_child(l)
-	elif c.get("damage", false):
-		var dark := _mat(Color(0.05, 0.04, 0.04), 0.9)
-		var f := Node3D.new()
-		f.position = pos + n * 0.001
-		f.basis = _frame(n)
-		root.add_child(f)
-		for k in 3:
-			_bit(f, _box(0.025, 0.0015, 0.0015), Vector3(k * 0.008 - 0.008, k * 0.004, 0), dark, Vector3(0, 0, 0.6 - k * 0.5))
-	if c.has("part"):
+	if c.has("tex") and tris.size() > 0:
+		Marks.patch(root, tris, pos, n, String(c["tex"]), float(c.get("w", 0.06)), String(c.get("fit", "")))
+	elif c.has("part"):
 		_part_at(root, String(c["part"]), pos, n, String(c.get("part_text", "")))
-
-static func _label(text: String, col: Color, n: Vector3) -> Label3D:
-	var l := Label3D.new()
-	l.text = text
-	var longest := 0
-	for line in text.split("\n"):
-		longest = maxi(longest, line.length())
-	l.pixel_size = 0.00035 * minf(1.0, 11.0 / maxf(float(longest), 1.0))      ## long marks shrink to fit the piece
-	l.font_size = 32
-	l.outline_size = 0
-	l.modulate = col
-	l.double_sided = false                                     ## seen only from the side it is on...
-	l.no_depth_test = true                                     ## ...and never swallowed by a curved case or a rim around it
-	l.basis = Basis.looking_at(-n, Vector3(0, 0, -1) if absf(n.y) > 0.9 else Vector3.UP)        ## its readable side faces out from the object
-	l.set_meta("clue", true)
-	return l
 
 ## A small mesh on a part, marked so the loupe's collider ignores it.
 static func _bit(parent: Node3D, mesh: Mesh, pos: Vector3, mat: Material, rot: Vector3 = Vector3.ZERO) -> MeshInstance3D:
@@ -295,6 +255,39 @@ static func _part_at(root: Node3D, kind: String, pos: Vector3, n: Vector3, text:
 	var steel := _mat(Color(0.62, 0.62, 0.64), 0.35, 0.8)
 	var dark := _mat(Color(0.08, 0.07, 0.06), 0.8)
 	match kind:
+		"teeth":                                                   ## the music box comb: a row of steel teeth with two gone
+			_bit(f, _box(0.05, 0.004, 0.0015), Vector3(0, -0.008, 0), steel)
+			for k in 11:
+				if k == 4 or k == 5:
+					continue
+				_bit(f, _box(0.0025, 0.012, 0.0012), Vector3(-0.022 + k * 0.0044, 0.0, 0), steel)
+		"crack":                                                   ## a hairline crack in glass: a fine pale zigzag
+			var pale := _mat(Color(0.95, 0.97, 1.0, 0.8), 0.1)
+			pale.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			for k in 4:
+				_bit(f, _box(0.011, 0.0007, 0.0006), Vector3(-0.016 + k * 0.0105, (0.002 if k % 2 == 0 else -0.002), 0), pale, Vector3(0, 0, 0.5 if k % 2 == 0 else -0.5))
+		"dent":                                                    ## a dent: a dark crescent with a bright lip
+			_bit(f, _cyl(0.008, 0.008, 0.0008, 14), Vector3(0, 0, -0.0004), _mat(Color(0.25, 0.18, 0.08), 0.7, 0.6), Vector3(PI * 0.5, 0, 0))
+			_bit(f, _box(0.014, 0.0012, 0.0008), Vector3(0, 0.0075, 0), _mat(Color(1.0, 0.92, 0.6), 0.2, 0.9))
+		"chip_glass":                                              ## a chip out of glass: a small bright notch
+			var g := _mat(Color(0.92, 0.97, 1.0, 0.9), 0.05)
+			g.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			_bit(f, _box(0.007, 0.005, 0.0008), Vector3.ZERO, g, Vector3(0, 0, 0.7))
+			_bit(f, _box(0.004, 0.003, 0.0009), Vector3(0.002, -0.002, 0), g, Vector3(0, 0, -0.4))
+		"chip_ceramic":                                            ## a chip out of the glaze: raw pale clay showing
+			var clay := _mat(Color(0.86, 0.78, 0.66), 0.95)
+			_bit(f, _box(0.009, 0.006, 0.0009), Vector3.ZERO, clay, Vector3(0, 0, 0.6))
+			_bit(f, _box(0.005, 0.004, 0.001), Vector3(0.003, 0.002, 0), clay, Vector3(0, 0, -0.3))
+		"pinholes":                                                ## pinholes in the bellows: light coming through
+			var lightm := _mat(Color(1.0, 0.95, 0.8), 0.5)
+			lightm.emission_enabled = true
+			lightm.emission = Color(1.0, 0.9, 0.7)
+			for k in 4:
+				_bit(f, _box(0.0018, 0.0018, 0.0008), Vector3(sin(k * 2.4) * 0.008, cos(k * 1.9) * 0.006, 0), lightm)
+		"airgap":                                                  ## water lost from the dome: a silvery air pocket under the glass top
+			var air := _mat(Color(0.85, 0.9, 0.95, 0.55), 0.05, 0.3)
+			air.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			_bit(f, _cyl(0.02, 0.02, 0.001, 20), Vector3(0, 0, -0.004), air, Vector3(PI * 0.5, 0, 0))
 		"screws":                                                  ## two cross-head screws
 			for sx: float in [-0.018, 0.018]:
 				_bit(f, _cyl(0.006, 0.006, 0.002, 12), Vector3(sx, 0, 0), steel, Vector3(PI * 0.5, 0, 0))
@@ -308,11 +301,6 @@ static func _part_at(root: Node3D, kind: String, pos: Vector3, n: Vector3, text:
 			var amber := _mat(Color(0.85, 0.62, 0.2), 0.1)
 			for k in 3:
 				_bit(f, _box(0.014, 0.0018, 0.0012), Vector3(k * 0.012 - 0.012, sin(float(k)) * 0.002, 0), amber, Vector3(0, 0, 0.15 * float(k - 1)))
-		"numbers":                                                 ## two serial numbers scratched in
-			var l := _label(text, Color(0.12, 0.12, 0.12, 0.9), Vector3(0, 0, 1))
-			l.basis = Basis.IDENTITY
-			l.pixel_size = 0.00028
-			f.add_child(l)
 		"grooves":                                                 ## knife cuts all exactly alike
 			for k in 5:
 				_bit(f, _box(0.022, 0.0018, 0.0012), Vector3(0, -0.012 + k * 0.006, 0), _mat(Color(0.3, 0.18, 0.09), 0.9))
@@ -338,12 +326,6 @@ static func _part_at(root: Node3D, kind: String, pos: Vector3, n: Vector3, text:
 			var gl := _mat(Color(0.95, 0.85, 0.5), 0.15, 1.0)
 			for k in 12:
 				_bit(f, _box(0.0025, 0.0025, 0.0008), Vector3(sin(k * 2.7) * 0.015, cos(k * 1.3) * 0.015, 0), gl, Vector3(0, 0, k))
-		"sticker":                                                 ## a paper price sticker
-			_bit(f, _box(0.03, 0.02, 0.0008), Vector3.ZERO, _mat(Color(0.95, 0.93, 0.85), 0.9))
-			var l2 := _label(text, Color(0.6, 0.08, 0.08, 1.0), Vector3(0, 0, 1))
-			l2.basis = Basis.IDENTITY
-			l2.position = Vector3(0, 0, 0.0008)
-			f.add_child(l2)
 		"stain":                                                   ## tea stain on a too-clean base
 			var tea := _mat(Color(0.42, 0.26, 0.12, 0.55), 0.9)
 			tea.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
