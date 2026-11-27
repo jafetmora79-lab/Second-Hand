@@ -203,7 +203,7 @@ func _build_feed() -> void:
 	feed.add_child(c)
 	c.current = true
 
-## The shop's own collection on the top shelves, not for sale: one of each kind of object, the real thing.
+## The shop's own collection in the glass counter, not for sale: one of each kind of object, the real thing.
 func _decorate() -> void:
 	var kinds := Items.KINDS.keys()
 	var spots: Array = shop["decor"]
@@ -212,7 +212,7 @@ func _decorate() -> void:
 		var spot: Vector3 = spots[i]
 		n.position = spot + Vector3(0, 0.1, 0)
 		n.scale = Vector3.ONE * 0.75
-		n.rotation.y = (PI * 0.5) * (1.0 if spot.x < 0.0 else -1.0)
+		n.rotation.y = rng.randf_range(-0.5, 0.5) + PI
 		add_child(n)
 
 func _arrived() -> void:

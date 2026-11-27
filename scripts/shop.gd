@@ -5,8 +5,8 @@ class_name Shop
 ## stop across the counter.
 
 const COUNTER_Z := -0.62
-const COUNTER_TOP := 0.96
-const MAT := Vector3(0.0, 0.985, -0.5)
+const COUNTER_TOP := 1.0                   ## the glass counter's top, 2.4 m wide
+const MAT := Vector3(0.0, 1.025, -0.5)     ## the velvet mat, behind the security screens on your side
 const CUSTOMER_SPOT := Vector3(0.0, 0.0, -1.45)
 const DOOR := Vector3(-2.2, 0.0, -3.9)
 const DOOR_W := 0.92                       ## the opening in the kit's doorway wall, at 3 m wide and 2.95 m tall
@@ -43,7 +43,6 @@ static func build(root: Node3D) -> Dictionary:
 	# the back wall: the doorway wall round the door, and the shop-window wall round the big window (opening about x 0.3..2.5, y 0.87..2.23)
 	_kit(shop, "HK_wall_door", Vector3(DOOR.x, -0.05, -4.0), 0.0, Vector3(3.0, 2.95, 0.2))
 	_kit(shop, "HK_wall_shop", Vector3(1.4, -0.05, -4.02), 0.0, Vector3(3.86, 2.95, 0.2))
-	var post := _box(shop, Vector3(-0.6, 1.425, -3.92), Vector3(0.3, 2.95, 0.32), _mat(Color(0.26, 0.17, 0.11)))   ## a corner post over the joint
 	# side walls and the wall behind you: log walls with plank wainscot
 	for side: float in [-1.0, 1.0]:
 		for z: float in [-2.75, -0.25]:
@@ -52,10 +51,16 @@ static func build(root: Node3D) -> Dictionary:
 		_kit(shop, "HK_wall_interior", Vector3(x, -0.05, 1.0), PI, Vector3(3.02, 2.95, 0.2))
 	# beams
 	for z in [-3.0, -1.5, 0.0]:
-		_box(shop, Vector3(0, 2.8, z), Vector3(6.0, 0.16, 0.18), dark)
-	# the counter (Timberline's shop counter) with the velvet mat on it
-	_kit(shop, "HK_counter", Vector3(0, 0, COUNTER_Z), 0.0, Vector3(2.7, COUNTER_TOP + 0.03, 0.68))
-	_box(shop, Vector3(0, COUNTER_TOP + 0.045, MAT.z), Vector3(0.62, 0.01, 0.42), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
+		for x: float in [-2.0, 0.0, 2.0]:
+			if _prop(shop, "shop/beam", Vector3(x, 2.7, z), 0.0, 0.0, 1, Vector3(2.02, 0.2, 0.22)) == null:
+				_box(shop, Vector3(x, 2.8, z), Vector3(2.0, 0.16, 0.18), dark)
+	# posts: over the joint in the back wall and in the four corners
+	for p: Vector3 in [Vector3(-0.6, 0, -3.84), Vector3(-2.82, 0, -3.84), Vector3(2.82, 0, -3.84), Vector3(-2.82, 0, 0.82), Vector3(2.82, 0, 0.82)]:
+		if _prop(shop, "shop/post", p, 0.0, 0.0, 1, Vector3(0.3, 2.95, 0.28)) == null:
+			_box(shop, p + Vector3(0, 1.425, 0), Vector3(0.3, 2.95, 0.3), dark)
+	# the counter: a pawn-shop glass case with security screens (Meshy), the shop's own collection inside, the velvet mat on top
+	var case_spots := _glass_counter(shop)
+	_box(shop, Vector3(0, COUNTER_TOP + 0.006, MAT.z), Vector3(0.62, 0.01, 0.42), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
 	# the warm light on the mat, from your right so nothing stands between you and the customer; a wall lantern by the window
 	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.75), 0.36, 0.0)
 	var lamp := SpotLight3D.new()
@@ -96,17 +101,13 @@ static func build(root: Node3D) -> Dictionary:
 	var lock_led := _box(buzzer, Vector3(0, 0.05, 0.025), Vector3(0.025, 0.025, 0.01), _mat(Color(0.9, 0.1, 0.08)))
 	(lock_led.material_override as StandardMaterial3D).emission_enabled = true
 	(lock_led.material_override as StandardMaterial3D).emission = Color(1.0, 0.1, 0.05)
-	# shelves along the side walls, with stock
+	# a shelving unit on each side wall (Meshy), four shelves of stock each
 	var shelves: Array = []
-	var decor: Array = []                                      ## the top shelves: the shop's own collection, not for sale
 	for side: float in [-1.0, 1.0]:
-		for k in 4:
-			var y := 0.55 + k * 0.5
-			_box(shop, Vector3(side * 2.78, y, -2.1), Vector3(0.4, 0.04, 2.4), trim)
-			for s in 4:
-				(decor if k == 3 else shelves).append(Vector3(side * 2.75, y + 0.03, -3.0 + s * 0.6))
-		_box(shop, Vector3(side * 2.78, 1.3, -0.88), Vector3(0.42, 2.2, 0.06), trim)
-		_box(shop, Vector3(side * 2.78, 1.3, -3.32), Vector3(0.42, 2.2, 0.06), trim)
+		_prop(shop, "shop/shelves", Vector3(side * 2.6, 0, -2.1), 2.3, side * -PI * 0.5)
+		for y: float in SHELF_Y:
+			for dz: float in [-0.55, 0.0, 0.55]:
+				shelves.append(Vector3(side * 2.58, y, -2.1 + dz))
 	# a wood stove in the corner (Timberline's), glowing, a log pile by it
 	if _prop(shop, "shop/FURN_stove", Vector3(-2.4, 0, 0.4), 1.0, PI * 0.5) == null:
 		_box(shop, Vector3(-2.4, 0.45, 0.4), Vector3(0.6, 0.9, 0.6), _mat(Color(0.1, 0.1, 0.11), 0.6, 0.4))
@@ -130,9 +131,34 @@ static func build(root: Node3D) -> Dictionary:
 	we.environment = env
 	root.add_child(we)
 	_dress(shop)
-	return {"node": shop, "shelves": shelves, "decor": decor, "lamp": lamp, "door": hinge, "lock_led": lock_led}
+	return {"node": shop, "shelves": shelves, "decor": case_spots, "lamp": lamp, "door": hinge, "lock_led": lock_led}
 
 ## Loads a model from assets/<file>.glb, scales it to `h` tall (or into `fit_box` when given), stands it on the floor at `pos`, turned `yaw`.
+## The heights of the four shelves in the shelving unit when it stands 2.3 m tall (measured off the model).
+const SHELF_Y := [0.29, 0.81, 1.28, 1.73]
+
+## The Meshy glass counter, 2.4 m wide, its paned front toward the customer and its security screens on their side of the mat.
+## Its glass is made see-through by a shader (shaders/glass_case.gdshader). Returns the spots inside the case for the shop's collection.
+static func _glass_counter(shop: Node3D) -> Array:
+	var spots: Array = []
+	var n := _prop(shop, "shop/counter_glass", Vector3(0, 0, COUNTER_Z), 0.0, PI, 1, Vector3(2.4, 0, 0))
+	if n == null:
+		_kit(shop, "HK_counter", Vector3(0, 0, COUNTER_Z), 0.0, Vector3(2.4, COUNTER_TOP, 0.8))
+		return spots
+	var sh := load("res://shaders/glass_case.gdshader") as Shader
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var src := m.get_active_material(i) as BaseMaterial3D
+			var g := ShaderMaterial.new()
+			g.shader = sh
+			if src != null:
+				g.set_shader_parameter("tex", src.albedo_texture)
+			m.set_surface_override_material(i, g)
+	for x: float in [-0.95, -0.65, -0.35, 0.35, 0.65, 0.95]:
+		spots.append(Vector3(x, 0.56, COUNTER_Z - 0.08))
+	return spots
+
 ## A Timberline house-kit piece (assets/kit), stretched to `size` (x along it, y up, z through it), bottom at pos.y, centred on pos.
 static func _kit(root: Node3D, piece: String, pos: Vector3, yaw: float, size: Vector3) -> Node3D:
 	var n := _prop(root, "kit/" + piece, pos, 0.0, yaw, 1, size)
@@ -177,7 +203,12 @@ static func _prop(root: Node3D, file: String, pos: Vector3, h: float, yaw: float
 	holder.position = pos
 	holder.rotation.y = yaw
 	if fit_box != Vector3.ZERO:
-		holder.scale = Vector3(fit_box.x / maxf(box.size.x, 0.001), fit_box.y / maxf(box.size.y, 0.001), fit_box.z / maxf(box.size.z, 0.001))
+		var k := Vector3(fit_box.x / maxf(box.size.x, 0.001), fit_box.y / maxf(box.size.y, 0.001), fit_box.z / maxf(box.size.z, 0.001))
+		var keep := maxf(k.x, maxf(k.y, k.z))
+		for a in 3:                                    ## an axis left at 0 keeps the proportion of the others
+			if fit_box[a] <= 0.0:
+				k[a] = keep
+		holder.scale = k
 	else:
 		holder.scale = Vector3.ONE * h / maxf(box.size.y, 0.001)
 	m.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z)

@@ -16,7 +16,7 @@ func run() -> void:
 	all.merge(People.FOLK)
 	all.merge(People.BUYERS)
 	all.merge(People.ROBBERS)
-	for id: String in ["trapper", "collector", "widow", "kid", "drifter", "robber", "collector_b"]:
+	for id: String in ["trapper", "collector", "widow", "kid", "drifter", "robber", "collector_b", "decorator"]:
 		if g.figure != null and is_instance_valid(g.figure):
 			g.figure.queue_free()
 		g.figure = People.figure(all[id], id)
