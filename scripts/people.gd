@@ -49,10 +49,10 @@ const DOOR_LOOK := {
 
 const BUYERS := {
 	"collector_b": {"name": "Mr. Pell, a collector", "coat": Color(0.25, 0.3, 0.26), "hat": Color(0.3, 0.22, 0.15), "skin": Color(0.84, 0.7, 0.6), "height": 1.75,
-		"want": ["instruments", "watches"], "pays": 1.35, "patience": 3,
+		"want": ["instruments", "watches"], "pays": 1.35, "patience": 3, "eye": 1.0,
 		"hello": "Good day. I collect fine instruments and timepieces. Anything on your shelves?", "fake": "This is a reproduction. I'm surprised at you."},
 	"decorator": {"name": "Jo, from the lodge", "coat": Color(0.55, 0.25, 0.28), "hat": Color(0.9, 0.86, 0.78), "skin": Color(0.9, 0.75, 0.64), "height": 1.66,
-		"want": ["household", "curios", "folk art"], "pays": 1.25, "patience": 3,
+		"want": ["household", "curios", "folk art"], "pays": 1.25, "patience": 3, "eye": 0.6,
 		"hello": "We're doing up the lodge for the season. Something with character?", "fake": "Hm, this looks newer than you said. No thanks."},
 }
 
@@ -139,16 +139,18 @@ static func play(figure: Node, what: String) -> bool:
 					var n := StringName(anim_name)
 					var turn := player.get_meta("gesture", 0) as int + 1
 					player.set_meta("gesture", turn)
+					var ref: WeakRef = weakref(player)                ## the customer may have left (and been freed) before the timer fires
 					player.get_tree().create_timer(minf(a.length, GESTURE)).timeout.connect(func() -> void:
-						if is_instance_valid(player) and player.get_meta("gesture", 0) == turn and player.assigned_animation == n:
-							for other in player.get_animation_list():     ## back to standing idle when the model has one
+						var player2 := ref.get_ref() as AnimationPlayer
+						if player2 != null and player2.get_meta("gesture", 0) == turn and player2.assigned_animation == n:
+							for other in player2.get_animation_list():     ## back to standing idle when the model has one
 								if String(other).to_lower().contains("idle"):
-									player.get_animation(other).loop_mode = Animation.LOOP_LINEAR
-									player.play(other, 0.5)
+									player2.get_animation(other).loop_mode = Animation.LOOP_LINEAR
+									player2.play(other, 0.5)
 									return
-							player.play(n, 0.5)
-							player.seek(0.0, true)
-							player.pause())
+							player2.play(n, 0.5)
+							player2.seek(0.0, true)
+							player2.pause())
 				return true
 	return false
 

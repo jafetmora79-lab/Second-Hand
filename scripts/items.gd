@@ -159,23 +159,20 @@ static func make(kind: String, rng: RandomNumberGenerator, fake_chance: float = 
 	return {"kind": kind, "name": k["name"], "cat": k["cat"], "clues": clues, "fake": fake, "value": roundi(value), "found": [], "base": k["base"],
 		"variant": variant, "tint": Color.WHITE if not fake else copy[6]}
 
-## The estimate the player can make from what they have found so far: a range that narrows with each clue.
+## The estimate the player can make from what they have found so far. It narrows with each clue found, by the same amount whatever the
+## object, so it never gives away how many details are still hidden on it (or that there are none left).
 static func estimate(item: Dictionary) -> Vector2:
 	var k: Dictionary = KINDS[item["kind"]]
 	var known := float(k["base"])
 	var fake_found := false
+	var n_found := 0
 	for c: Dictionary in item["clues"]:
 		if c["id"] in item["found"]:
+			n_found += 1
 			if c.get("fake", false):
 				fake_found = true
 			known *= float(c.get("mult", 1.0))
 	if fake_found:
 		return Vector2(float(k["fake_value"]) * 0.7, float(k["fake_value"]) * 1.3)
-	var total: int = item["clues"].size()
-	var n_found := 0
-	for c3: Dictionary in item["clues"]:
-		if c3["id"] in item["found"]:
-			n_found += 1
-	var left := clampf(1.0 - float(n_found) / maxf(float(total), 1.0), 0.0, 1.0)
-	var spread := lerpf(0.12, 0.75, left)
+	var spread := maxf(0.75 * pow(0.62, float(n_found)), 0.18)
 	return Vector2(known * (1.0 - spread), known * (1.0 + spread * 1.6))

@@ -67,6 +67,7 @@ func _ready() -> void:
 	_actions.offset_left = -270
 	_actions.offset_right = -24
 	_actions.offset_top = -200
+	_actions.grow_vertical = Control.GROW_DIRECTION_BEGIN     ## more buttons (a buyer's choices) stack upward
 	_actions.offset_bottom = -30
 	_actions.alignment = BoxContainer.ALIGNMENT_END
 	_actions.add_theme_constant_override("separation", 8)
@@ -233,6 +234,12 @@ func _build_haggle() -> void:
 	take.text = "Pay their price"
 	take.pressed.connect(func() -> void: game.accept_ask())
 	v.add_child(take)
+	var again := Button.new()                                ## back to the loupe without losing the haggle: same ask, same patience
+	again.text = "Look again"
+	again.pressed.connect(func() -> void:
+		_haggle.visible = false
+		game.start_inspect())
+	v.add_child(again)
 	var walk := Button.new()
 	walk.text = "No thanks"
 	walk.pressed.connect(func() -> void:
@@ -272,6 +279,18 @@ func show_seller_actions() -> void:
 		hide_actions()
 		game.start_haggle())
 	_action("Not interested", func() -> void: game.decline())
+
+## A buyer is here: show them one of the pieces they collect (what you paid is beside each), or nothing.
+func show_present_choices(choices: Array) -> void:
+	hide_actions()
+	for st: Dictionary in choices.slice(0, 4):
+		var it: Dictionary = st["item"]
+		_action("Show the %s ($%d)" % [String(it["name"]).to_lower(), st["paid"]], func() -> void:
+			hide_actions()
+			game.present(st))
+	_action("Nothing for you today", func() -> void:
+		hide_actions()
+		game._leave("Suit yourself."))
 
 func show_buyer_actions(price: int) -> void:
 	hide_actions()

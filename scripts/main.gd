@@ -15,7 +15,11 @@ const PORCH := Vector3(-2.2, 0, -5.6)      ## where callers wait, outside the do
 const STREET := Vector3(2.0, 0, -7.6)      ## where they come from and go back to, along the lane
 const INSIDE := Vector3(-2.2, 0, -3.3)     ## just inside the door
 
-var rng := RandomNumberGenerator.new()
+const DEFAULT_SEED := 2026
+var rng := RandomNumberGenerator.new()     ## everything that decides the game: who comes, what they bring, prices, robberies
+var fx_rng := RandomNumberGenerator.new()  ## looks only (animals, how an object lies on the mat): never touches the game's own dice
+var game_seed := DEFAULT_SEED              ## a run is fully reproducible from this; set with --seed=N after -- on the command line
+var seed_override := -1                    ## set before the node enters the tree (tests) to choose the seed without the command line
 var cam: Camera3D
 var shop: Dictionary
 var ui: ShopUi
@@ -47,7 +51,9 @@ var day_total := 1                         ## callers today, for the time of day
 var day_time := 0.0                        ## 0 morning .. 1 night, shown through the window
 
 func _ready() -> void:
-	rng.seed = 2026
+	game_seed = seed_override if seed_override >= 0 else _seed_from_args()
+	rng.seed = game_seed
+	fx_rng.seed = game_seed + 1
 	shop = Shop.build(self)
 	shelf_slots = shop["shelves"]
 	_build_feed()
@@ -69,13 +75,28 @@ func _ready() -> void:
 	layer.add_child(ui)
 	_start_day()
 
+## --seed=N among the user arguments (godot ... -- --seed=N) picks the run; otherwise DEFAULT_SEED.
+func _seed_from_args() -> int:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--seed="):
+			return int(a.substr(7))
+	return DEFAULT_SEED
+
+## Array.shuffle() uses the global generator; this uses the game's own, so a seed always gives the same week.
+func _shuffle(a: Array) -> void:
+	for i in range(a.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var t = a[i]
+		a[i] = a[j]
+		a[j] = t
+
 # ---- the day -----------------------------------------------------------------------------------------------------------------------
 
 func _start_day() -> void:
 	day_log = {"bought": 0, "sold": 0, "spent": 0, "earned": 0}
 	queue.clear()
 	var sellers := ["trapper", "widow", "kid", "collector", "drifter"]
-	sellers.shuffle()
+	_shuffle(sellers)
 	var n_sellers := mini(2 + mini(day, 3), sellers.size())
 	var legit := rng.randi() % n_sellers                ## one seller a day always brings the real thing, so the rent can be made
 	for i in n_sellers:
@@ -133,9 +154,9 @@ func _set_time(t: float, secs: float) -> void:
 ## Now and then an animal wanders past the window (a rabbit, a wolf, a bear far off, a raven overhead).
 func _animal_loop() -> void:
 	while is_inside_tree():
-		await get_tree().create_timer(rng.randf_range(12.0, 30.0)).timeout
+		await get_tree().create_timer(fx_rng.randf_range(12.0, 30.0)).timeout
 		if state != "inspect" and state != "haggle":
-			Outside.spawn_animal(self, rng)
+			Outside.spawn_animal(self, fx_rng)
 
 ## They ring. The porch camera comes on and shows them, with what the shop remembers about them.
 func _at_door() -> void:
@@ -233,7 +254,7 @@ func _decorate() -> void:
 		var spot: Vector3 = spots[i]
 		n.position = spot + Vector3(0, 0.1, 0)
 		n.scale = Vector3.ONE * 0.75
-		n.rotation.y = rng.randf_range(-0.5, 0.5) + PI
+		n.rotation.y = fx_rng.randf_range(-0.5, 0.5) + PI
 		add_child(n)
 
 func _arrived() -> void:
@@ -268,7 +289,7 @@ func _arrived() -> void:
 func _place_item() -> void:
 	if item_node != null:
 		item_node.queue_free()
-	pivot.basis = Basis(Vector3.UP, rng.randf_range(-0.6, 0.6))
+	pivot.basis = Basis(Vector3.UP, fx_rng.randf_range(-0.6, 0.6))
 	rest_q = pivot.quaternion
 	want_q = rest_q
 	item_node = Models.build(item)
@@ -278,6 +299,9 @@ func _place_item() -> void:
 	create_tween().tween_property(pivot, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _leave(text: String, hurry: bool = false) -> void:
+	if visitor.get("leaving", false):                    ## already on their way out: never send the same person off twice
+		return
+	visitor["leaving"] = true
 	var info: Dictionary = visitor["info"]
 	_say(info["name"], text)
 	ui.hide_actions()
@@ -563,6 +587,9 @@ func _buy(price: int) -> void:
 	if price > money:
 		ui.toast("You don't have $%d." % price)
 		return
+	if _free_slot() == Vector3.INF:
+		ui.toast("Your shelves are full. Sell something first.")
+		return
 	var info: Dictionary = visitor["info"]
 	money -= price
 	day_log["bought"] += 1
@@ -598,23 +625,33 @@ func _free_slot() -> Vector3:
 func _buyer_arrived(info: Dictionary) -> void:
 	state = "sell"
 	var wanted: Array = info["want"]
-	var best: Dictionary = {}
+	var choices: Array = []
 	for st: Dictionary in stock:
-		if st["item"]["cat"] in wanted and (best.is_empty() or int(st["item"]["value"]) > int(best["item"]["value"])):
-			best = st
-	if best.is_empty():
+		if st["item"]["cat"] in wanted:
+			choices.append(st)
+	if choices.is_empty():
 		_say(info["name"], "%s\nHm. Nothing here for me today." % info["hello"])
 		get_tree().create_timer(2.5).timeout.connect(func() -> void: _leave("Maybe next time."))
 		return
-	visitor["deal"] = best
-	if best["item"]["fake"]:
-		_caught_fake(best["item"])
-		_say(info["name"], "%s\nThat %s... %s" % [info["hello"], String(best["item"]["name"]).to_lower(), info["fake"]])
+	_say(info["name"], "%s\nWhat have you got?" % info["hello"])
+	ui.show_present_choices(choices)
+
+## You choose which piece to show the buyer (they never pick by its hidden value). An expert sees through a copy every time;
+## an amateur only sometimes. Otherwise they make an offer from what the piece really is.
+func present(st: Dictionary) -> void:
+	var info: Dictionary = visitor["info"]
+	var it: Dictionary = st["item"]
+	if it["fake"] and rng.randf() < float(info.get("eye", 1.0)):
+		state = "refused"                                ## no sale can go through while they say so and leave
+		_caught_fake(it)
+		_say(info["name"], "That %s... %s" % [String(it["name"]).to_lower(), info["fake"]])
 		get_tree().create_timer(3.5).timeout.connect(func() -> void: _leave("Good day."))
 		return
-	ask = roundi(float(best["item"]["value"]) * float(info["pays"]) * rng.randf_range(0.85, 1.05) / 5.0) * 5
+	visitor["deal"] = st
+	var worth := float(it["value"]) if not it["fake"] else float(it["base"])     ## a copy that fools them is priced as a plain example
+	ask = maxi(5, roundi(worth * float(info["pays"]) * rng.randf_range(0.85, 1.05) / 5.0) * 5)
 	patience = int(info["patience"])
-	_say(info["name"], "%s\n\"I'll give you $%d for the %s.\" (You paid $%d.)" % [info["hello"], ask, String(best["item"]["name"]).to_lower(), best["paid"]])
+	_say(info["name"], "\"I'll give you $%d for the %s.\" (You paid $%d.)" % [ask, String(it["name"]).to_lower(), st["paid"]])
 	ui.show_buyer_actions(ask)
 
 func sell_accept() -> void:
