@@ -113,6 +113,6 @@ Make 5 separate square images, one at a time, all in exactly the same style. Eac
 2. A tall rustic square timber post, hand-hewn dark wood with visible adze marks and iron bolts, a simple carved bracket at the top, straight and plain so it can stand in a wall corner.
 3. A heavy rustic ceiling beam, a long hand-hewn dark timber with adze marks and two iron straps, seen from the side, straight and plain.
 4. An open wall shelving unit for an antique shop, dark stained wood, four deep shelves, carved side panels, empty shelves, straight front so it can stand against a wall.
-5. A glass display counter for an antique shop: a long wooden counter with a glass top and glass front panels, brass corners, a wooden base with drawers at the back; the inside shelves are EMPTY and the glass is clear.
+5. A pawn-shop style display counter: a long counter with a warm honey-wood base, a glass-topped display case with glass front panels running its full length, and tall clear glass security screens standing on top of it in metal frames, with a small open gap at counter height in the middle to pass things through. Thin brass trim on the edges. The display case inside is EMPTY and all the glass is clear.
 ```
 The counter is asked for empty on purpose: Meshy can't make real see-through glass, so I'll give it real glass panes in the game and put the shop's actual Meshy objects (the ones you're selling) inside it.
