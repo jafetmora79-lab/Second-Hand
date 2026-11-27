@@ -49,6 +49,19 @@ var rep := {}                              ## what the shop remembers about each
 var feed: SubViewport                      ## the porch camera
 var day_total := 1                         ## callers today, for the time of day: morning at the first, night after the last
 var day_time := 0.0                        ## 0 morning .. 1 night, shown through the window
+var tutorial := 0                          ## the guided first customer on day 1: the step shown (0 not started, -1 done or skipped)
+
+## The tips for the guided first customer, in order. Each shows when the player reaches that moment.
+const TIPS := [
+	"",
+	"Someone's at the door. Check them on the porch camera, then buzz them in.",
+	"Old Amos has put a music box on the mat. Take a closer look before you pay anything.",
+	"Drag to turn it, or use Turn over: makers stamp the underside. Zoom in and rest the loupe on what catches your eye.",
+	"Found one. The music box in the glass case is a real Lindqvist: compare the stamp. Keep looking for more details.",
+	"Each detail narrows your estimate. When you're ready, make an offer.",
+	"Offer under their price. Watch their patience: push too hard and they walk out.",
+	"What you buy goes on your shelves. Buyers come later in the day: show them what they collect. Rent is due on day 7.",
+]
 
 func _ready() -> void:
 	game_seed = seed_override if seed_override >= 0 else _seed_from_args()
@@ -97,10 +110,16 @@ func _start_day() -> void:
 	queue.clear()
 	var sellers := ["trapper", "widow", "kid", "collector", "drifter"]
 	_shuffle(sellers)
+	if day == 1 and tutorial == 0:                      ## the guided first customer: Old Amos, first in, with a real piece
+		sellers.erase("trapper")
+		sellers.push_front("trapper")
 	var n_sellers := mini(2 + mini(day, 3), sellers.size())
 	var legit := rng.randi() % n_sellers                ## one seller a day always brings the real thing, so the rent can be made
 	for i in n_sellers:
 		queue.append({"type": "seller", "id": sellers[i], "legit": i == legit})
+	if day == 1 and tutorial == 0:
+		queue[0]["legit"] = true
+		queue[0]["tutorial"] = true
 	if day >= 1:
 		var b: String = ["collector_b", "decorator"][day % 2]
 		queue.insert(mini(2, queue.size()), {"type": "buyer", "id": b})
@@ -158,6 +177,17 @@ func _animal_loop() -> void:
 		if state != "inspect" and state != "haggle":
 			Outside.spawn_animal(self, fx_rng)
 
+## Shows the guided first customer's tip for step `n`, only while that customer is here and only moving forward.
+func _tip(n: int) -> void:
+	if tutorial < 0 or not visitor.get("tutorial", false) or n <= tutorial:
+		return
+	tutorial = n
+	ui.show_tip(TIPS[n])
+
+func skip_tutorial() -> void:
+	tutorial = -1
+	ui.hide_tip()
+
 ## They ring. The porch camera comes on and shows them, with what the shop remembers about them.
 func _at_door() -> void:
 	figure.look_at(PORCH + Vector3(0, 0, 1.0), Vector3.UP, true)
@@ -170,6 +200,7 @@ func _at_door() -> void:
 	var r: Dictionary = rep.get(id, {})
 	var title := String(visitor["info"]["name"]) if int(r.get("visits", 0)) > 0 else "Someone at the door"
 	ui.show_door(title, "*Bzzz.*  " + String(People.DOOR_LOOK.get(id, "")), _memory(id), feed.get_texture())
+	_tip(1)
 
 ## What the shop remembers about a caller, for the camera.
 func _memory(id: String) -> String:
@@ -190,6 +221,7 @@ func _remember(id: String, what: String) -> void:
 
 func buzz_in() -> void:
 	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	ui.hide_feed()
 	_remember(visitor["id"], "visits")
 	state = "walking"
 	_door(true)
@@ -209,6 +241,7 @@ func buzz_in() -> void:
 
 func turn_away() -> void:
 	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	ui.hide_feed()
 	ui.say("", "You leave the door locked. After a moment they turn and trudge off up the lane.")
 	state = "walking"
 	var f := figure
@@ -269,11 +302,14 @@ func _arrived() -> void:
 	if visitor["type"] == "seller":
 		var kinds := Items.KINDS.keys()
 		var kind: String = kinds[rng.randi() % kinds.size()]
+		if visitor.get("tutorial", false):
+			kind = "music_box"                           ## the guided piece: a real one, with the reference copy in the case to compare
 		var fake_chance := 0.55 if visitor["id"] == "drifter" else (0.3 if visitor["id"] == "collector" else 0.18)
 		if visitor.get("legit", false):
 			fake_chance = 0.0
 		item = Items.make(kind, rng, fake_chance)
 		item["seller"] = visitor["id"]
+		_tip(2)
 		_place_item()
 		var belief := float(info["belief"]) * (float(item["value"]) if not item["fake"] else float(Items.KINDS[kind]["base"]) * 1.3)
 		ask = maxi(5, roundi(belief * 1.25 / 5.0) * 5)
@@ -302,6 +338,9 @@ func _leave(text: String, hurry: bool = false) -> void:
 	if visitor.get("leaving", false):                    ## already on their way out: never send the same person off twice
 		return
 	visitor["leaving"] = true
+	if visitor.get("tutorial", false):
+		_tip(7)
+		get_tree().create_timer(9.0).timeout.connect(func() -> void: skip_tutorial())
 	var info: Dictionary = visitor["info"]
 	_say(info["name"], text)
 	ui.hide_actions()
@@ -410,6 +449,7 @@ func start_inspect() -> void:
 	zoom = 0.75
 	_lift(HELD_H)
 	ui.show_inspect(item)
+	_tip(3)
 
 func stop_inspect() -> void:
 	state = "talk"
@@ -506,6 +546,7 @@ func _loupe(delta: float) -> void:
 		for c2: Dictionary in item["clues"]:
 			if c2["id"] == best:
 				ui.found_clue(c2)
+				_tip(4 if item["found"].size() < 2 else 5)
 				if c2.get("fake", false):
 					_caught_fake(item)
 		ui.refresh_inspect(item)
@@ -545,6 +586,7 @@ func _unhandled_input(event: InputEvent) -> void:
 # ---- haggling ----------------------------------------------------------------------------------------------------------------------
 
 func start_haggle() -> void:
+	_tip(6)
 	state = "haggle"
 	ui.show_haggle(item, ask, patience)
 

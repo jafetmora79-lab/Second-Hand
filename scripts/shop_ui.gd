@@ -24,6 +24,8 @@ var _summary: Control = null
 var _feed: PanelContainer                  ## the porch camera: who is at the door
 var _feed_tex: TextureRect
 var _feed_note: Label
+var _tip: PanelContainer                   ## the guided first customer's tips, top middle
+var _tip_text: Label
 var _title: Label
 var _sub: Label
 var _toast_t := 0.0
@@ -75,6 +77,7 @@ func _ready() -> void:
 	_build_inspect()
 	_build_haggle()
 	_build_feed()
+	_build_tip()
 	_title = UiStyle.title_label("", 64, UiStyle.CREAM)
 	_title.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -105,6 +108,37 @@ func _panel_right(width: float) -> PanelContainer:
 	p.visible = false
 	add_child(p)
 	return p
+
+func _build_tip() -> void:
+	_tip = PanelContainer.new()
+	_tip.add_theme_stylebox_override("panel", UiStyle.panel_box(UiStyle.PANEL_SOLID, 10, UiStyle.AMBER, 14.0))
+	_tip.anchor_left = 0.5
+	_tip.anchor_right = 0.5
+	_tip.offset_left = -190                                    ## right of the porch camera panel
+	_tip.offset_right = 410
+	_tip.offset_top = 70
+	_tip.visible = false
+	add_child(_tip)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 12)
+	_tip.add_child(h)
+	_tip_text = UiStyle.text_label("", 16, UiStyle.CREAM)
+	_tip_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tip_text.custom_minimum_size = Vector2(470, 0)
+	h.add_child(_tip_text)
+	var skip := Button.new()
+	skip.text = "Skip tips"
+	skip.add_theme_font_size_override("font_size", 13)
+	skip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	skip.pressed.connect(func() -> void: game.skip_tutorial())
+	h.add_child(skip)
+
+func show_tip(text: String) -> void:
+	_tip_text.text = text
+	_tip.visible = true
+
+func hide_tip() -> void:
+	_tip.visible = false
 
 func _build_feed() -> void:
 	_feed = PanelContainer.new()
@@ -145,6 +179,9 @@ func show_door(title: String, look: String, note: String, tex: Texture2D) -> voi
 		hide_actions()
 		_feed.visible = false
 		game.turn_away())
+
+func hide_feed() -> void:
+	_feed.visible = false
 
 func show_robbery_actions() -> void:
 	hide_actions()
