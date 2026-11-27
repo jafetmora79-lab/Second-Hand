@@ -19,7 +19,7 @@ func run() -> void:
 	cam.fov = 35
 	root.add_child(cam)
 	cam.current = true
-	for kind in ["music_box", "pocket_watch", "carved_bear", "compass", "lantern"]:
+	for kind in (OS.get_environment("KINDS").split(",") if OS.get_environment("KINDS") != "" else ["music_box", "pocket_watch", "carved_bear", "compass", "lantern"]):
 		var holder := Node3D.new()
 		root.add_child(holder)
 		var m := (load("res://assets/items/%s.glb" % kind) as PackedScene).instantiate() as Node3D

@@ -62,31 +62,31 @@ const KINDS := {
 	"camera": {
 		"name": "Folding camera", "cat": "instruments", "base": 160, "fake_value": 15,
 		"clues": [
-			{"id": "lens", "pos": Vector3(0, 0.0, 0.09), "text": "The lens ring reads \"Tessar 1:4.5\": a good lens.", "mult": 1.4, "label": "TESSAR 1:4.5", "face": "front"},
-			{"id": "bellows", "pos": Vector3(0.04, 0.0, 0.04), "text": "Pinholes in the bellows: light leaks.", "mult": 0.7, "damage": true},
+			{"id": "lens", "from": "front", "at": Vector2(0.0, 0.1), "pos": Vector3(0, 0.0, 0.09), "text": "The lens ring reads \"Tessar 1:4.5\": a good lens.", "mult": 1.4, "label": "TESSAR 1:4.5", "face": "front"},
+			{"id": "bellows", "from": "right", "at": Vector2(0.4, 0.05), "pos": Vector3(0.04, 0.0, 0.04), "text": "Pinholes in the bellows: light leaks.", "mult": 0.7, "damage": true},
 		],
 		"fake_clues": [
-			{"id": "fake_lens", "pos": Vector3(0, 0.0, 0.09), "text": "The lens is plastic under the chrome paint.", "fake": true, "label": "TESSAR?", "face": "front"},
+			{"id": "fake_lens", "from": "front", "at": Vector2(0.0, 0.1), "pos": Vector3(0, 0.0, 0.09), "text": "The lens is plastic under the chrome paint.", "fake": true, "label": "TESSAR?", "face": "front"},
 		],
 	},
 	"snow_globe": {
 		"name": "Snow globe", "cat": "curios", "base": 60, "fake_value": 5,
 		"clues": [
-			{"id": "plate", "pos": Vector3(0, -0.035, 0.05), "text": "The brass plate reads \"Pinecrest 1952\": made here in town.", "mult": 1.7, "label": "PINECREST\n1952", "face": "front"},
-			{"id": "water", "pos": Vector3(0.0, 0.07, 0.0), "text": "An air bubble at the top: some water has leaked out.", "mult": 0.85, "damage": true},
+			{"id": "plate", "from": "front", "at": Vector2(0.0, -0.58), "pos": Vector3(0, -0.035, 0.05), "text": "The brass plate reads \"Pinecrest 1952\": made here in town.", "mult": 1.7, "label": "PINECREST\n1952", "face": "front"},
+			{"id": "water", "from": "top", "at": Vector2(0.0, 0.0), "pos": Vector3(0.0, 0.07, 0.0), "text": "An air bubble at the top: some water has leaked out.", "mult": 0.85, "damage": true},
 		],
 		"fake_clues": [
-			{"id": "fake_plate", "pos": Vector3(0, -0.035, 0.05), "text": "The \"brass\" plate is a sticker.", "fake": true, "label": "PINECREST", "face": "front"},
+			{"id": "fake_plate", "from": "front", "at": Vector2(0.0, -0.58), "pos": Vector3(0, -0.035, 0.05), "text": "The \"brass\" plate is a sticker.", "fake": true, "label": "PINECREST", "face": "front"},
 		],
 	},
 	"jug": {
 		"name": "Stoneware jug", "cat": "household", "base": 55, "fake_value": 6,
 		"clues": [
-			{"id": "crown", "pos": Vector3(0.0, 0.0, 0.075), "text": "A blue crown stamp: the Red Wing pottery, early 1900s.", "mult": 1.9, "label": "♛", "face": "front"},
-			{"id": "chip", "pos": Vector3(0.0, 0.13, 0.02), "text": "A chip on the lip of the neck.", "mult": 0.85, "damage": true},
+			{"id": "crown", "from": "front", "at": Vector2(-0.1, -0.12), "pos": Vector3(0.0, 0.0, 0.075), "text": "A blue crown stamp: the Red Wing pottery, early 1900s.", "mult": 1.9, "label": "♛", "face": "front"},
+			{"id": "chip", "from": "top", "at": Vector2(0.22, 0.0), "pos": Vector3(0.0, 0.13, 0.02), "text": "A chip on the lip of the neck.", "mult": 0.85, "damage": true},
 		],
 		"fake_clues": [
-			{"id": "fake_glaze", "pos": Vector3(0.0, -0.09, 0.0), "text": "The base is unglazed and too clean: a new jug, aged with tea.", "fake": true},
+			{"id": "fake_glaze", "from": "bottom", "at": Vector2(0.0, 0.0), "pos": Vector3(0.0, -0.09, 0.0), "text": "The base is unglazed and too clean: a new jug, aged with tea.", "fake": true},
 		],
 	},
 }

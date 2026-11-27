@@ -13,7 +13,7 @@ func run() -> void:
 	var g: Node3D = (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(g)
 	await wait(7.0)
-	for kind in ["music_box", "pocket_watch", "carved_bear", "compass", "lantern"]:
+	for kind in Items.KINDS.keys():
 		var k: Dictionary = Items.KINDS[kind]
 		var clues: Array = []
 		for c: Dictionary in k["clues"]:

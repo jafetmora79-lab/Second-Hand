@@ -99,3 +99,18 @@ static func figure(info: Dictionary, id: String) -> Node3D:
 		eye.position = Vector3(ex, h * 0.875, 0.115)
 		root.add_child(eye)
 	return root
+
+## Plays the figure's own animation whose name contains `what` ("walk", "idle", "talk", "wave"...), looping, if its model has one
+## (Meshy rigged and animated models carry an AnimationPlayer). Returns false when there is none, so the stand-in bob is used.
+static func play(figure: Node, what: String) -> bool:
+	if figure == null or not is_instance_valid(figure):
+		return false
+	for ap in figure.find_children("*", "AnimationPlayer", true, false):
+		var player := ap as AnimationPlayer
+		for anim_name in player.get_animation_list():
+			if String(anim_name).to_lower().contains(what):
+				var a := player.get_animation(anim_name)
+				a.loop_mode = Animation.LOOP_LINEAR if what in ["walk", "idle", "run"] else Animation.LOOP_NONE
+				player.play(anim_name, 0.25)
+				return true
+	return false

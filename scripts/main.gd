@@ -84,13 +84,19 @@ func _next_visitor() -> void:
 	add_child(figure)
 	ui.bell()
 	state = "walking"
+	figure.look_at(Vector3(Shop.DOOR.x, 0, -2.6) + Vector3(0, 0, 0.01), Vector3.UP, true)
+	People.play(figure, "walk")
 	var tw := create_tween()
 	tw.tween_property(figure, "position", Vector3(Shop.DOOR.x, 0, -2.6), 0.9)
+	tw.tween_callback(func() -> void: figure.look_at(Shop.CUSTOMER_SPOT + Vector3(0, 0, 0.01), Vector3.UP, true))
 	tw.tween_property(figure, "position", Shop.CUSTOMER_SPOT, 1.4).set_trans(Tween.TRANS_SINE)
 	tw.tween_callback(_arrived)
 
 func _arrived() -> void:
 	var info: Dictionary = visitor["info"]
+	figure.rotation = Vector3.ZERO                       ## face the counter
+	if not People.play(figure, "idle"):
+		figure.set_meta("bob", true)
 	if visitor["type"] == "seller":
 		var kinds := Items.KINDS.keys()
 		var kind: String = kinds[rng.randi() % kinds.size()]
@@ -132,6 +138,9 @@ func _leave(text: String) -> void:
 	var f := figure
 	var tw := create_tween()
 	tw.tween_interval(1.2)
+	tw.tween_callback(func() -> void:
+		f.look_at(Vector3(Shop.DOOR.x, 0, -2.6), Vector3.UP, true)
+		People.play(f, "walk"))
 	tw.tween_property(f, "position", Vector3(Shop.DOOR.x, 0, -2.6), 1.3)
 	tw.tween_property(f, "position", Shop.DOOR + Vector3(0, 0, -0.2), 0.8)
 	tw.tween_callback(func() -> void:
@@ -198,7 +207,7 @@ func _process(delta: float) -> void:
 		cam.transform = cam.transform.interpolate_with(want, clampf(delta * 8.0, 0.0, 1.0))
 	if state == "inspect":
 		_loupe(delta)
-	if figure != null and is_instance_valid(figure) and state in ["talk", "inspect", "haggle", "sell"]:
+	if figure != null and is_instance_valid(figure) and figure.has_meta("bob") and state in ["talk", "inspect", "haggle", "sell"]:
 		figure.position.y = absf(sin(Time.get_ticks_msec() * 0.002)) * 0.01          ## a little breathing bob
 
 ## Where the loupe (the mouse) points on the object; resting on a hidden detail long enough reveals it.
