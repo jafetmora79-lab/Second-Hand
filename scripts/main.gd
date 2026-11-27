@@ -41,7 +41,7 @@ var dwell := 0.0
 var dwell_clue := ""
 var zoom := 0.85
 var dragging := false
-# the view from behind the counter: look around by dragging (or the arrow keys / WASD); while a customer talks, the camera turns to
+# the view from behind the counter: look around by moving the mouse to an edge of the screen (or the arrow keys / WASD); while a customer talks, the camera turns to
 # frame their face and narrows a little, as The Veil's conversation camera does (world.gd talk camera: FOV x0.9, ~0.4 s to settle)
 const SHOP_EYE := Vector3(0, 1.62, 0.35)
 const SHOP_LOOK := Vector3(0, 1.3, -2.2)
@@ -51,7 +51,8 @@ const TALK_EASE := 7.0                     ## ~0.4 s to settle on the speaker
 const LOOK_EASE := 10.0
 var look_yaw := 0.0                        ## the player's own look-around, relative to the counter view
 var look_pitch := 0.0
-var looking := false                       ## dragging the view right now
+const EDGE := 0.07                         ## the band round the screen's edge, as a share of its size, where the mouse turns the view
+const EDGE_SPEED := 1.2                    ## radians a second with the mouse right at the edge
 var talk_focus := false                    ## a customer is talking: frame them (until the player looks away)
 const VIEW_STATES := ["idle", "walking", "at_door", "talk", "sell", "robbery", "refused"]
 const MONITOR_SNAP := 0.26                 ## look within this angle (radians) of the monitor and the view zooms in to it
@@ -593,6 +594,10 @@ func _process(delta: float) -> void:
 			float(Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_S)))
 		if keys != Vector2.ZERO:
 			_look(-keys.x * 1.4 * delta, keys.y * 1.0 * delta)
+		else:
+			var edge := _edge_look()
+			if edge != Vector2.ZERO:
+				_look(-edge.x * EDGE_SPEED * delta, -edge.y * EDGE_SPEED * 0.7 * delta)
 		_view(delta)
 	if pivot != null:
 		pivot.quaternion = pivot.quaternion.slerp(want_q, clampf(delta * 12.0, 0.0, 1.0))
@@ -652,6 +657,28 @@ func _loupe(delta: float) -> void:
 					_caught_fake(item)
 		ui.refresh_inspect(item)
 
+## How far into the edge band the mouse is, -1..1 on each axis (0 in the middle of the screen, over a button or panel, or outside
+## the window), so moving the mouse to the side of the screen turns the view that way, faster the nearer the edge.
+func _edge_look() -> Vector2:
+	var vp := get_viewport()
+	var size := vp.get_visible_rect().size
+	var m := vp.get_mouse_position()
+	if m.x < 0.0 or m.y < 0.0 or m.x > size.x or m.y > size.y:
+		return Vector2.ZERO
+	if vp.gui_get_hovered_control() != null:
+		return Vector2.ZERO
+	var n := m / size
+	var e := Vector2.ZERO
+	if n.x < EDGE:
+		e.x = -(1.0 - n.x / EDGE)
+	elif n.x > 1.0 - EDGE:
+		e.x = 1.0 - (1.0 - n.x) / EDGE
+	if n.y < EDGE:
+		e.y = -(1.0 - n.y / EDGE)
+	elif n.y > 1.0 - EDGE:
+		e.y = 1.0 - (1.0 - n.y) / EDGE
+	return e
+
 ## Points the look-around at a spot (the monitor), or back to the counter view with Vector3.ZERO.
 func _aim_at(p: Vector3) -> void:
 	if p == Vector3.ZERO:
@@ -679,12 +706,7 @@ func _look(dyaw: float, dpitch: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if state in VIEW_STATES:
-		if event is InputEventMouseButton and ((event as InputEventMouseButton).button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]):
-			looking = (event as InputEventMouseButton).pressed
-		elif event is InputEventMouseMotion and looking:
-			var mm := event as InputEventMouseMotion
-			_look(-mm.relative.x * 0.004, -mm.relative.y * 0.004)
-		return
+		return                                            ## looking around is the mouse at the screen's edge (or the keys), not dragging
 	if state != "inspect" and state != "haggle":
 		return
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
