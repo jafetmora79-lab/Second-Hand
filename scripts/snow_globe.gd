@@ -9,7 +9,7 @@ class_name SnowGlobe
 
 const CUT := -0.16              ## the top of the wooden base, in the Meshy mesh's units (its dome starts just above)
 const DOME_R := 0.33            ## the glass dome's radius in the same units
-const FLAKES := 90
+const FLAKES := 150
 
 static func build(model: Node3D) -> void:
 	var base_node: MeshInstance3D = null
@@ -22,15 +22,9 @@ static func build(model: Node3D) -> void:
 	var r := DOME_R
 	var base_top := Vector3(aabb.get_center().x, CUT, aabb.get_center().z)
 	var centre := base_top + Vector3(0, r * 0.82, 0)
-	# the glass: clear, a little blue, catching the light at its rim
-	var glass := StandardMaterial3D.new()
-	glass.albedo_color = Color(0.86, 0.93, 1.0, 0.13)
-	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass.roughness = 0.04
-	glass.metallic_specular = 1.0
-	glass.rim_enabled = true
-	glass.rim = 0.5
-	glass.rim_tint = 0.2
+	# the glass: clear where you look through it, bright at its rim, with a highlight (shaders/globe_glass.gdshader)
+	var glass := ShaderMaterial.new()
+	glass.shader = load("res://shaders/globe_glass.gdshader") as Shader
 	var dome := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
 	sphere.radius = r
@@ -109,11 +103,15 @@ class Flakes extends MultiMeshInstance3D:
 		rng.seed = 7
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
-		var q := BoxMesh.new()
-		q.size = Vector3.ONE * r * 0.045
+		var q := SphereMesh.new()                            ## small round flakes, a little see-through: snow, not confetti
+		q.radius = r * 0.014
+		q.height = r * 0.028
+		q.radial_segments = 6
+		q.rings = 3
 		var m := StandardMaterial3D.new()
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		m.albedo_color = Color(1, 1, 1)
+		m.albedo_color = Color(1, 1, 1, 0.85)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		q.material = m
 		mm.mesh = q
 		mm.instance_count = n
@@ -137,14 +135,15 @@ class Flakes extends MultiMeshInstance3D:
 		var down := (b.inverse() * Vector3.DOWN).normalized()   ## world "down" in the globe's frame
 		var turned := (b * last.inverse()).get_rotation_quaternion().get_angle()
 		last = b
-		var stir := clampf(turned / maxf(delta, 0.001), 0.0, 12.0)       ## how fast it is being turned, rad/s
-		var drag := exp(-3.0 * delta)
+		var stir := clampf(turned / maxf(delta, 0.001), 0.0, 14.0)       ## how fast it is being turned, rad/s
+		var drag := exp(-1.6 * delta)                         ## water: the swirl dies away over a few seconds
 		for i in pos.size():
 			var v: Vector3 = vel[i]
 			var p: Vector3 = pos[i]
-			if stir > 0.3:
-				v += Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.4, 1), rng.randf_range(-1, 1)) * stir * radius * 0.35 * delta
-			v += down * radius * 0.35 * delta                 ## sinking slowly through the water
+			if stir > 0.3:                                    ## a turn sends the snow up and round: lift, a spin about the axis, some scatter
+				var spin := Vector3(-p.z, 0.0, p.x).normalized() if Vector2(p.x, p.z).length() > 0.001 else Vector3.ZERO
+				v += (Vector3(0, 0.45, 0) + spin * 1.0 + Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.6, 1), rng.randf_range(-1, 1)) * 1.3) * stir * radius * 0.45 * delta
+			v += down * radius * 0.16 * delta                 ## sinking slowly through the water
 			v *= drag
 			p += v * delta
 			if p.length() > radius:                            ## the glass
