@@ -594,6 +594,8 @@ func _build_monitor() -> void:
 	var screen := MeshInstance3D.new()
 	var q := QuadMesh.new()
 	q.size = Vector2(box.size.x * SCREEN_W, box.size.y * SCREEN_H)
+	q.subdivide_width = 24                                 ## fine enough for the shader to bow the glass into a dome
+	q.subdivide_depth = 18
 	screen.mesh = q
 	screen_mat = ShaderMaterial.new()
 	screen_mat.shader = load("res://shaders/crt_screen.gdshader") as Shader
