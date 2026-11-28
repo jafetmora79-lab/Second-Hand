@@ -2,10 +2,13 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bcgy6rhu3e54j"
+uid="uid://d3g775aj1l7hq"
 path="res://.godot/imported/trapper_Image_0.png-8ab8b163502c175633be0b3b2f682d41.ctex"
 metadata={
 "vram_texture": false
+}
+generator_parameters={
+"md5": "5f2313cad0b9c863145260b54f0a75a2"
 }
 
 [deps]
@@ -21,7 +24,7 @@ compress/lossy_quality=0.7
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
