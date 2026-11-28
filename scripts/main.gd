@@ -573,6 +573,10 @@ func _build_feed() -> void:
 ## camera. Look at it and the view zooms in to the screen; when someone rings, the view turns to it by itself.
 ## The monitor is a simple boxy CRT until its Meshy model arrives.
 const DESK := Vector3(-1.78, 0.0, -0.72)
+const SCREEN_W := 0.6                     ## the porch camera's picture on the Meshy monitor's glass, as shares of the cabinet's size
+const SCREEN_H := 0.42
+const SCREEN_X := 0.0
+const SCREEN_Y := 0.6
 var monitor_screen := Vector3.ZERO           ## the middle of the screen, world space
 var screen_mat: ShaderMaterial
 func _build_monitor() -> void:
@@ -585,25 +589,18 @@ func _build_monitor() -> void:
 	var to_eye := SHOP_EYE - top
 	mon.rotation.y = atan2(to_eye.x, to_eye.z)             ## its screen faces you behind the counter
 	node.add_child(mon)
-	var shell := StandardMaterial3D.new()
-	shell.albedo_color = Color(0.58, 0.5, 0.38)
-	shell.roughness = 0.55
-	var dark := StandardMaterial3D.new()
-	dark.albedo_color = Color(0.08, 0.08, 0.08)
-	dark.roughness = 0.4
-	Shop._box(mon, Vector3(0, 0.16, -0.02), Vector3(0.36, 0.3, 0.3), shell)          ## the cabinet
-	Shop._box(mon, Vector3(0, 0.17, 0.132), Vector3(0.3, 0.23, 0.012), dark)         ## the bezel
-	Shop._box(mon, Vector3(0.13, 0.04, 0.135), Vector3(0.05, 0.025, 0.01), dark)     ## a knob strip
+	var tv := Shop._prop(mon, "shop/monitor", Vector3.ZERO, 0.0, 0.0, 1, Vector3(0.4, 0.0, 0.0))    ## the walnut CRT (Meshy)
+	var box := Shop.prop_box(tv) if tv != null else AABB(Vector3(-0.2, 0, -0.15), Vector3(0.4, 0.42, 0.3))
 	var screen := MeshInstance3D.new()
 	var q := QuadMesh.new()
-	q.size = Vector2(0.26, 0.195)
+	q.size = Vector2(box.size.x * SCREEN_W, box.size.y * SCREEN_H)
 	screen.mesh = q
 	screen_mat = ShaderMaterial.new()
 	screen_mat.shader = load("res://shaders/crt_screen.gdshader") as Shader
 	screen_mat.set_shader_parameter("feed", feed.get_texture())
 	screen_mat.set_shader_parameter("on", 0.0)
 	screen.material_override = screen_mat
-	screen.position = Vector3(0, 0.17, 0.14)
+	screen.position = Vector3(box.get_center().x + box.size.x * SCREEN_X, box.position.y + box.size.y * SCREEN_Y, box.end.z + 0.003)
 	mon.add_child(screen)
 	monitor_screen = mon.position + mon.basis * screen.position
 
@@ -953,6 +950,7 @@ func _view(delta: float) -> void:
 	cam.fov = lerpf(cam.fov, fov, k)
 
 func _process(delta: float) -> void:
+	Shop.set_clock(shop.get("clock_hands", []), 8.0 + day_time * 12.0)   ## opening at eight, dark by eight
 	if amber != null:
 		var k: float = amber.get_shader_parameter("inspection")
 		amber.set_shader_parameter("inspection", move_toward(k, 1.0 if state in ["inspect", "haggle"] else 0.0, delta * 2.5))
@@ -1078,6 +1076,14 @@ func _look(dyaw: float, dpitch: float) -> void:
 	look_pitch = clampf(look_pitch + dpitch, -0.55, 0.6)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo \
+			and (event as InputEventKey).keycode == KEY_E and not state in ["inspect", "haggle"]:
+		pull_lamp()
+		return
+	if state in VIEW_STATES and event is InputEventMouseButton and (event as InputEventMouseButton).pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT and _clicked_lamp((event as InputEventMouseButton).position):
+		pull_lamp()
+		return
 	if state in VIEW_STATES:
 		return                                            ## looking around is the mouse at the screen's edge (or the keys), not dragging
 	if state != "inspect" and state != "haggle":
@@ -1120,6 +1126,43 @@ func _unhandled_input(event: InputEvent) -> void:
 		want_q = (Quaternion(Vector3.UP, mm.relative.x * 0.008) * Quaternion(right, mm.relative.y * 0.008) * want_q).normalized()
 
 var _press_at := Vector2.ZERO
+
+## The banker's lamp: pull its chain (E, or click the lamp). The chain dips, then springs back with a bounce and a little sway,
+## and the lamp clicks on or off: its glow, and the light on the mat.
+func pull_lamp() -> void:
+	var dl: Dictionary = shop.get("desk_lamp", {})
+	var chain: Node3D = dl.get("chain")
+	if chain == null or not is_instance_valid(chain) or dl.get("pulling", false):
+		return
+	dl["pulling"] = true
+	if not chain.has_meta("rest"):
+		chain.set_meta("rest", chain.position)
+	var rest: Vector3 = chain.get_meta("rest")
+	var tw := create_tween()
+	tw.tween_property(chain, "position", rest + Vector3(0, -0.06, 0), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void:
+		dl["on"] = not dl["on"]
+		var on: bool = dl["on"]
+		(dl["bulb"] as OmniLight3D).light_energy = 0.9 if on else 0.0
+		(shop["lamp"] as SpotLight3D).light_energy = 2.5 if on else 0.35)
+	tw.tween_property(chain, "position", rest, 0.7).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void: dl["pulling"] = false)
+	var sway := create_tween()                                ## and it swings a little as it springs back
+	for k in 5:
+		var a := 0.35 * pow(0.55, k) * (1.0 if k % 2 == 0 else -1.0)
+		sway.tween_property(chain, "rotation:z", a, 0.14).set_trans(Tween.TRANS_SINE)
+	sway.tween_property(chain, "rotation:z", 0.0, 0.14).set_trans(Tween.TRANS_SINE)
+
+## True if the mouse is on the banker's lamp (within a hand's width of it on screen).
+func _clicked_lamp(mp: Vector2) -> bool:
+	var dl: Dictionary = shop.get("desk_lamp", {})
+	var lamp: Node3D = dl.get("node")
+	if lamp == null or not is_instance_valid(lamp):
+		return false
+	var at := lamp.global_position + Vector3(0, 0.2, 0)
+	if cam.is_position_behind(at):
+		return false
+	return cam.unproject_position(at).distance_to(mp) < 70.0
 
 ## The piece's moving parts, if it has any.
 func _living() -> Living:

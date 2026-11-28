@@ -162,7 +162,7 @@ static func build(root: Node3D) -> Dictionary:
 	if _prop(shop, "shop/FURN_stove", Vector3(-0.77, 0, -3.55), 1.0, STOVE_YAW) == null:
 		_box(shop, Vector3(-0.77, 0.45, -3.55), Vector3(0.6, 0.9, 0.6), _mat(Color(0.1, 0.1, 0.11), 0.6, 0.4))
 	_prop(shop, "shop/HK_log_pile", Vector3(-0.08, 0, -3.62), 0.42, 0.1)
-	_prop(shop, "shop/HK_pew", Vector3(1.4, 0, -3.62), 0.0, 0.0, 1, Vector3(1.7, 0.78, 0.0))       ## a bench under the window
+	_prop(shop, "shop/bench", Vector3(1.4, 0, -3.66), 0.0, 0.0, 1, Vector3(1.6, 0.0, 0.0))        ## a low bench under the window
 	var stove_light := OmniLight3D.new()
 	stove_light.position = Vector3(-0.77, 0.6, -3.1)
 	stove_light.omni_range = 2.6
@@ -182,7 +182,74 @@ static func build(root: Node3D) -> Dictionary:
 	we.environment = env
 	root.add_child(we)
 	_dress(shop)
-	return {"node": shop, "shelves": shelves, "decor": case_spots, "lamp": lamp, "door": hinge, "lock_led": lock_led, "sign": sign}
+	var props := _furnish(shop)
+	return {"node": shop, "shelves": shelves, "decor": case_spots, "lamp": lamp, "door": hinge, "lock_led": lock_led, "sign": sign,
+		"desk_lamp": props["desk_lamp"], "clock_hands": props["clock_hands"]}
+
+## A prop's bounding box in its parent's space (for placing things on its face: the clock's hands, the monitor's screen).
+static func prop_box(holder: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	for mi in holder.find_children("*", "MeshInstance3D", true, false):
+		var b := Models._rel(holder.get_parent(), mi as Node3D) * (mi as MeshInstance3D).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+## The Meshy props made from the user's images: the banker's lamp and the ledger on the counter, the wall clock, the rug.
+## Returns the lamp (its chain and light, for the pull cord) and the clock's hands (the game sets the time).
+static func _furnish(shop: Node3D) -> Dictionary:
+	# the rug where customers stand (the user's woven rug, a flat texture: no model needed)
+	var rug := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1.8, 1.8)
+	rug.mesh = pm
+	var rm := StandardMaterial3D.new()
+	rm.albedo_texture = load("res://assets/shop/rug.png") as Texture2D
+	rm.roughness = 1.0
+	rug.material_override = rm
+	rug.position = Vector3(0, 0.008, -2.3)
+	shop.add_child(rug)
+	# the ledger, open on the counter left of the mat
+	_prop(shop, "shop/ledger", Vector3(-0.66, COUNTER_TOP, -0.42), 0.0, 0.3, 1, Vector3(0.32, 0.0, 0.0))
+	# the banker's lamp right of the mat: its pull chain is a separate part (tools/split_props.py) so it can be pulled
+	var lamp := _prop(shop, "shop/bankers_lamp_parts", Vector3(0.74, COUNTER_TOP, -0.5), 0.32, -0.55)
+	var chain: Node3D = null
+	if lamp != null:
+		chain = lamp.find_child("Chain", true, false) as Node3D
+	var bulb := OmniLight3D.new()                                ## the glow under the green shade
+	bulb.light_color = Color(1.0, 0.9, 0.7)
+	bulb.light_energy = 0.9
+	bulb.omni_range = 1.1
+	bulb.position = Vector3(0.7, COUNTER_TOP + 0.2, -0.47)
+	shop.add_child(bulb)
+	# the wall clock on the back wall, between the door and the stove; hands drawn on its blank dial
+	var hands: Array = []
+	var clock := _prop(shop, "shop/wall_clock", Vector3(-1.25, 1.42, -3.8), 0.78, 0.0)
+	if clock != null:
+		var box := prop_box(clock)
+		var dial := Vector3(box.get_center().x, box.position.y + box.size.y * 0.635, box.end.z + 0.004)
+		var ink := _mat(Color(0.12, 0.09, 0.07), 0.6)
+		for spec: Array in [[0.05, 0.007], [0.072, 0.005]]:      ## hour hand, minute hand
+			var pivot := Node3D.new()
+			pivot.position = dial
+			shop.add_child(pivot)
+			var hand := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(spec[1], spec[0], 0.003)
+			hand.mesh = bm
+			hand.material_override = ink
+			hand.position = Vector3(0, spec[0] * 0.4, 0)          ## turns about its tail end, near the dial's middle
+			pivot.add_child(hand)
+			hands.append(pivot)
+	return {"desk_lamp": {"node": lamp, "chain": chain, "bulb": bulb, "on": true}, "clock_hands": hands}
+
+## The clock's hands at `hours` (0..24).
+static func set_clock(hands: Array, hours: float) -> void:
+	if hands.size() < 2:
+		return
+	(hands[0] as Node3D).rotation.z = -fmod(hours, 12.0) / 12.0 * TAU
+	(hands[1] as Node3D).rotation.z = -fmod(hours, 1.0) * TAU
 
 ## The OPEN sign's glow, 0 (switched off: a dull board) to 1 (lit).
 static func set_sign(sign: Node3D, k: float) -> void:
