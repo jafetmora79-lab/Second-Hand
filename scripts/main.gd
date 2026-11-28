@@ -367,7 +367,7 @@ func ledger_antiques() -> Array:
 				fate = "sold to %s for $%d (%s$%d)" % [b["to"], b["sold_for"], "+" if int(b["sold_for"]) >= int(b["paid"]) else "-", absi(int(b["sold_for"]) - int(b["paid"]))]
 			"stolen":
 				fate = "stolen"
-		out.append({"name": "%s, from %s, day %d: paid $%d" % [b["name"], b["from"], b["day"], b["paid"]], "fate": fate, "findings": b["findings"]})
+		out.append({"name": "%s, from %s, day %d: paid $%d" % [b["name"], b["from"], b["day"], b["paid"]], "fate": fate, "findings": b["findings"], "kind": b.get("kind", "")})
 	return out
 
 ## Each day's books, and today's so far.
@@ -1255,7 +1255,7 @@ func _buy(price: int) -> void:
 	for c: Dictionary in item["clues"]:
 		if c["id"] in item["found"]:
 			found.append(String(c["text"]))
-	var bought := {"name": String(item["name"]), "from": String(info["name"]), "day": day, "paid": price, "status": "shelf", "findings": found}
+	var bought := {"name": String(item["name"]), "kind": String(item["kind"]), "from": String(info["name"]), "day": day, "paid": price, "status": "shelf", "findings": found}
 	purchases.append(bought)
 	day_log["bought"] += 1
 	day_log["spent"] += price

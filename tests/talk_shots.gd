@@ -46,6 +46,10 @@ func run() -> void:
 	g.zoom = 0.3
 	await wait(1.5)
 	await snap("inspect_comb")
+	g.want_q = Quaternion(Vector3.UP, -1.3) * Quaternion(Vector3.RIGHT, 0.25)
+	g.zoom = 0.4
+	await wait(1.5)
+	await snap("inspect_side")
 	g.start_haggle()
 	await wait(0.6)
 	await snap("haggle")

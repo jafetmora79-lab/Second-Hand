@@ -17,7 +17,7 @@ ITEMS = os.path.join(ROOT, "assets", "items")
 WATCH_BODY = "(y > 0.1 and ((((x+0.05)**2+(z+0.05)**2)**0.5 < 0.335 and x < 0.265) or (abs(x+0.03) < 0.15 and z > 0.2)))"
 # per kind: parts in Blender coordinates (Z up). A hinge closes about `axis` until the part lies flat across `normal` at `cap`.
 SPEC = {
-    "music_box": {"parts": [
+    "music_box": {"keep": "dark", "unstack_where": "abs(x) > 0.41 or y < -0.41 or z < -0.38 or z > 0.0 or y > 0.38", "parts": [   ## the inlaid outer panels only                     ## its inlays are the darker of the stacked layers
         {"name": "Lid", "pick": "z > -0.02 and y > 0.15", "type": "hinge", "axis": "X", "normal": Vector((0, 0, 1))},
     ]},
     "compass": {"parts": [
@@ -48,6 +48,65 @@ def dedupe(obj):
     bm.to_mesh(obj.data)
     bm.free()
     return len(dup)
+
+
+def unstack(obj, keep="bright", where="True"):
+    """Faces lying on top of other faces (Meshy's inlays and panels: the same plane within a hair, one inside the other) flicker
+    against each other in the game. Of each such pair, delete the darker one (the plain panel behind the inlay)."""
+    from mathutils import kdtree
+    from mathutils.geometry import intersect_point_tri
+    me = obj.data
+    img = None
+    for m in me.materials:
+        if m and m.use_nodes:
+            for n in m.node_tree.nodes:
+                if n.type == "TEX_IMAGE" and n.image:
+                    img = n.image
+    px = img.pixels[:] if img else None
+    W, H = (img.size if img else (1, 1))
+    uv = me.uv_layers.active.data
+
+    def bright(p):
+        if px is None:
+            return 0.0
+        u = sum(uv[i].uv.x for i in p.loop_indices) / p.loop_total
+        v = sum(uv[i].uv.y for i in p.loop_indices) / p.loop_total
+        i = (int(v % 1 * H) * W + int(u % 1 * W)) * 4
+        return px[i] + px[i + 1] + px[i + 2]
+
+    polys = list(me.polygons)
+    kd = kdtree.KDTree(len(polys))
+    for p in polys:
+        kd.insert(p.center, p.index)
+    kd.balance()
+    gone = set()
+    for p in polys:
+        if p.index in gone or len(p.vertices) != 3:
+            continue
+        x, y, z = p.center
+        if not eval(where):                                      ## only where the flicker is (a model's outer panels, say)
+            continue
+        a, b, c = (me.vertices[i].co for i in p.vertices)
+        reach = max((a - p.center).length, (b - p.center).length, (c - p.center).length)
+        for (co, j, dist) in kd.find_range(p.center, reach):
+            if j == p.index or j in gone:
+                continue
+            q = polys[j]
+            if q.normal.dot(p.normal) < 0.98 or abs((q.center - p.center).dot(p.normal)) > 0.004:      ## facing the same way: back-to-back faces never flicker
+                continue
+            if intersect_point_tri(q.center - p.normal * (q.center - p.center).dot(p.normal), a, b, c) is None:
+                continue                                         ## side by side in one plane, not on top of each other
+            darker = bright(q) <= bright(p)
+            gone.add(j if darker == (keep == "bright") else p.index)      ## which layer is the real surface depends on the model
+            if p.index in gone:
+                break
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in gone], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+    return len(gone)
 
 
 def separate(obj, pick):
@@ -160,6 +219,7 @@ def run(kind):
     bpy.context.view_layer.objects.active = body
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     print(kind, "duplicate faces removed:", dedupe(body))
+    print(kind, "stacked faces removed:", unstack(body, spec.get("keep", "bright"), spec.get("unstack_where", "True")))
     out = {}
     parts = []
     for ps in spec["parts"]:

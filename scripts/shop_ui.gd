@@ -443,12 +443,28 @@ func _fill_ledger() -> void:
 			if rows.is_empty():
 				_ledger_body.add_child(_ink("You haven't bought anything yet.", 13, UiStyle.INK_SOFT))
 			for r: Dictionary in rows:
-				_ledger_body.add_child(_ink(String(r["name"]), 18))
-				_ledger_body.add_child(_ink(String(r["fate"]), 13, UiStyle.INK_SOFT))
+				var row := HBoxContainer.new()
+				row.add_theme_constant_override("separation", 14)
+				var icon := TextureRect.new()
+				var path := "res://assets/ui/items/%s.png" % String(r.get("kind", ""))
+				if ResourceLoader.exists(path):
+					icon.texture = load(path) as Texture2D
+				icon.custom_minimum_size = Vector2(64, 64)
+				icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+				row.add_child(icon)
+				var col := VBoxContainer.new()
+				col.add_theme_constant_override("separation", 3)
+				col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				col.add_child(_ink(String(r["name"]), 18))
+				col.add_child(_ink(String(r["fate"]), 13, UiStyle.INK_SOFT))
 				for f: String in r["findings"]:
-					var l2 := _ink("  - " + f, 13)
-					l2.custom_minimum_size = Vector2(680, 0)
-					_ledger_body.add_child(l2)
+					var l2 := _ink("- " + f, 13)
+					l2.custom_minimum_size = Vector2(600, 0)
+					col.add_child(l2)
+				row.add_child(col)
+				_ledger_body.add_child(row)
 		_:
 			rows = game.ledger_accounts()
 			var total := 0
@@ -533,8 +549,9 @@ func _action(text: String, cb: Callable, kind: String = "wood") -> void:
 ## Someone rang: what you can tell about them (their picture is on the desk monitor, and in the portrait), and the two choices.
 func show_door(title: String, look: String, note: String, tex: Texture2D) -> void:
 	_feed_tex = tex
-	say(title, look + "\n" + note)
-	show_door_actions(true)
+	say(title, look)
+	set_tag(note)                                            ## what the shop remembers about them: a tag above their portrait
+	show_door_actions(false)
 
 ## The door's choices; you can ask a caller what they want once.
 func show_door_actions(can_ask: bool) -> void:
@@ -542,7 +559,7 @@ func show_door_actions(can_ask: bool) -> void:
 	_action("Let them in", func() -> void:
 		hide_actions()
 		game.buzz_in(), "go")
-	if can_ask:
+	if can_ask:                                              ## (no longer offered: they say why they're here when they come in)
 		_action("Ask what they want", func() -> void: game.ask_door())
 	_action("Turn them away", func() -> void:
 		hide_actions()
@@ -799,6 +816,11 @@ func _icon_plaque(piece: String, at: Vector2) -> float:
 	return w
 
 ## After `delay` seconds the speech box fades away (the customer has gone and nobody is talking).
+## A small tag above the speaker's portrait (what the shop remembers about them); "" removes it.
+var _tag_text := ""
+func set_tag(text: String) -> void:
+	_tag_text = text
+
 func fade_speech(delay: float = 2.5) -> void:
 	if not _speech.visible:
 		return
@@ -809,6 +831,7 @@ func fade_speech(delay: float = 2.5) -> void:
 	_fade_tween.tween_property(self, "_speech_alpha", 0.0, 0.9).set_trans(Tween.TRANS_SINE)
 	_fade_tween.tween_callback(func() -> void:
 		_speech.visible = false
+		_tag_text = ""
 		_speech_alpha = 1.0)
 
 ## The screen fades toward black (`a` = 1) or back (`a` = 0) over `secs`.
@@ -873,14 +896,37 @@ func _draw() -> void:
 			draw_arc(loupe_at, r - 5, -PI * 0.5, -PI * 0.5 + TAU * clampf(loupe_progress, 0.0, 1.0), 48, UiStyle.AMBER, 4.0, true)
 		if loupe_hint != "":
 			draw_string(font, loupe_at + Vector2(-40, r + 22), loupe_hint, HORIZONTAL_ALIGNMENT_CENTER, 80, UiStyle.px(13), UiStyle.AMBER)
-	# a toast: a slip of paper at the top
+	# the speaker's tag, above the portrait
+	if _tag_text != "" and _speech.visible and not _hint.visible:      ## (the controls strip has that spot while you inspect)
+		var tfs := UiStyle.px(13)
+		var tsz := font.get_string_size(_tag_text, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs)
+		var tr := Rect2(_speech.position + Vector2(10, -38), Vector2(tsz.x + 34, 34))
+		var tsb := UiStyle.parchment_box(0.0, "parch_tag")
+		tsb.modulate_color = Color(1, 1, 1, _speech.modulate.a)
+		draw_style_box(tsb, tr)
+		draw_string(font, Vector2(tr.position.x + 17, tr.position.y + (tr.size.y + font.get_ascent(tfs) - font.get_descent(tfs)) * 0.5 - 1),
+			_tag_text, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs, Color(UiStyle.INK, _speech.modulate.a))
+	# a toast: a slip of paper at the top, in the free space between the tip card and the notes card, never over either
 	if _toast_t > 0.0:
 		var fade := minf(1.0, _toast_t * 2.0)
-		var tw := 520.0
-		var fs := UiStyle.px(13)
+		var t_left := 24.0
+		if _tip.visible:
+			t_left = _tip.position.x + _tip.size.x + 14.0
+		var t_right := size.x - 24.0
+		if _inspect.visible:
+			t_right = _inspect.position.x - 14.0
+		elif _haggle.visible:
+			t_right = _haggle.position.x - 14.0
+		var t_top := 74.0
+		if t_right - t_left < 420.0 and _tip.visible:            ## too narrow up there: the free space under the tip card instead
+			t_left = _tip.position.x
+			t_right = _tip.position.x + _tip.size.x
+			t_top = _tip.position.y + _tip.size.y + 12.0
+		var tw := clampf(t_right - t_left - 28.0, 200.0, 640.0)
+		var fs := UiStyle.px(18)
 		var ts := font.get_multiline_string_size(_toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs)
-		var rr := Rect2(Vector2(size.x * 0.5 - tw * 0.5 - 14, 72), Vector2(tw + 28, ts.y + 18))
+		var rr := Rect2(Vector2((t_left + t_right) * 0.5 - tw * 0.5 - 14, t_top), Vector2(tw + 28, ts.y + 20))
 		var sb := UiStyle.parchment_box(0.0, "parch_strip")
 		sb.modulate_color = Color(1, 1, 1, fade)
 		draw_style_box(sb, rr)
-		draw_multiline_string(font, Vector2(rr.position.x + 14, rr.position.y + 9 + font.get_ascent(fs)), _toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs, -1, Color(UiStyle.INK, fade))
+		draw_multiline_string(font, Vector2(rr.position.x + 14, rr.position.y + 10 + font.get_ascent(fs)), _toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs, -1, Color(UiStyle.INK, fade))

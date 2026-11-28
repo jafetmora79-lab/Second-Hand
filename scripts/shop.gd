@@ -83,8 +83,9 @@ static func build(root: Node3D) -> Dictionary:
 			if _prop(shop, "shop/beam", Vector3(x, 2.7, z), 0.0, 0.0, 1, Vector3(2.02, 0.2, 0.22)) == null:
 				_box(shop, Vector3(x, 2.8, z), Vector3(2.0, 0.16, 0.18), dark)
 	# posts: over the joint in the back wall and in the four corners
-	for p: Vector3 in [Vector3(-0.6, 0, -3.84), Vector3(-2.82, 0, -3.84), Vector3(2.82, 0, -3.84), Vector3(-2.82, 0, 0.82), Vector3(2.82, 0, 0.82)]:
-		if _prop(shop, "shop/post", p, 0.0, 0.0, 1, Vector3(0.3, 2.95, 0.28)) == null:
+	for p: Vector3 in [Vector3(-0.53, 0, -3.84), Vector3(-2.82, 0, -3.84), Vector3(2.82, 0, -3.84), Vector3(-2.82, 0, 0.82), Vector3(2.82, 0, 0.82)]:
+		var wide := 0.46 if p.x == -0.53 else 0.3                ## the joint in the back wall is wider than a corner: cover it all
+		if _prop(shop, "shop/post", p, 0.0, 0.0, 1, Vector3(wide, 2.95, 0.28)) == null:
 			_box(shop, p + Vector3(0, 1.425, 0), Vector3(0.3, 2.95, 0.3), dark)
 	# the counter: a pawn-shop glass case with security screens (Meshy), the shop's own collection inside, the velvet mat on top
 	var case_spots := _glass_counter(shop)
