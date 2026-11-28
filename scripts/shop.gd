@@ -323,7 +323,9 @@ static func _glass_counter(shop: Node3D) -> Array:
 const U_SIZE := Vector3(2.6, 1.541, 1.6)    ## fitted so its countertop is at COUNTER_TOP
 const U_Z := 0.06
 static func _u_counter(shop: Node3D) -> Array:
-	var n := _prop(shop, "shop/counter_u", Vector3(0, 0, U_Z), 0.0, 0.0, 1, U_SIZE)
+	## the customer-facing shell (tools/strip_counter.py took out Meshy's malformed rear); proper cabinetry is built behind it
+	var shell := "shop/counter_u_shell" if ResourceLoader.exists("res://assets/shop/counter_u_shell.glb") else "shop/counter_u"
+	var n := _prop(shop, shell, Vector3(0, 0, U_Z), 0.0, 0.0, 1, U_SIZE)
 	var sh := load("res://shaders/glass_case.gdshader") as Shader
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
@@ -333,16 +335,110 @@ static func _u_counter(shop: Node3D) -> Array:
 			g.shader = sh
 			if src != null:
 				g.set_shader_parameter("tex", src.albedo_texture)
-			g.set_shader_parameter("top_y", Vector2(0.035, 0.085))            ## the front case's top is glass either side of the mat
-			g.set_shader_parameter("top_rect", Vector4(-0.47, -0.49, 0.47, -0.27))
-			g.set_shader_parameter("top_gap", 0.1)
-			g.set_shader_parameter("staff_doors", true)                     ## from your side: wood and sliding doors
+			g.set_shader_parameter("top_y", Vector2(9.0, 9.0))               ## a continuous wooden countertop
 			g.set_shader_parameter("screen_base", 0.075)        ## just above its countertop (model space)
 			m.set_surface_override_material(i, g)
-	var spots: Array = []
-	for x: float in [-0.85, -0.55, -0.25, 0.25, 0.55, 0.85]:     ## on the case's floor (measured at 0.49 m), under the glass top
-		spots.append(Vector3(x, 0.49, -0.57))
+	if shell.ends_with("_shell"):
+		_u_cabinetry(shop)
+	var spots: Array = []                                    ## on the display compartments' floors: four along the front, one in each corner bay
+	for x: float in [-1.03, -0.55, -0.25, 0.25, 0.55, 1.03]:
+		spots.append(Vector3(x, CAB_FLOOR, -0.2 if absf(x) > 1.0 else -0.555))   ## (corner bays: x +-1.03 sits within the arms' 0.8..1.22)
 	return spots
+
+## The counter's working side, as real cabinetry (clean low-poly wood in the counter's own texture): a continuous countertop; open display
+## compartments under it, their floors flat and supported, divided by vertical boards that run from the top to the base; solid cupboards
+## with doors beneath; a recessed plinth. The front between the arms, and each arm as an L that turns the corner, so the corner bays open
+## toward you. The customer-facing shell (glass, brass) stays in front of all of it.
+const CAB_TOP := 0.9                       ## the countertop's underside
+const CAB_FLOOR := 0.49                    ## the display compartments' floor
+const CAB_FRONT := -0.69                   ## just inside the shell's front
+const CAB_BACK := -0.42                    ## the front section's open side, toward you
+const CAB_IN := 0.8                        ## an arm's inner face (toward you), either side
+const CAB_OUT := 1.18                      ## an arm's outer wall, inside the shell
+const CAB_FH := 0.74                       ## the front section's half width: inside the shell's angled corners at the front
+const CAB_ARM_FRONT := -0.43               ## the arms' cabinets start here: clear of the shell's angled glass corners
+const CAB_END := 0.84                      ## the arms' back ends
+static func _u_cabinetry(shop: Node3D) -> void:
+	var wood := StandardMaterial3D.new()
+	wood.albedo_texture = load("res://assets/shop/counter_wood.png") as Texture2D
+	wood.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	wood.uv1_triplanar = true
+	wood.uv1_world_triplanar = true
+	wood.uv1_scale = Vector3.ONE * 1.7
+	wood.roughness = 0.75
+	var dark := wood.duplicate() as StandardMaterial3D
+	dark.albedo_color = Color(0.62, 0.55, 0.5)                 ## the plinth and the insides of compartments, in shadow
+	var door := wood.duplicate() as StandardMaterial3D
+	door.albedo_color = Color(1.08, 1.02, 0.96)
+	var brass := _mat(Color(0.85, 0.65, 0.3), 0.35, 0.8)
+	var b := func(lo: Vector3, hi: Vector3, m: Material) -> void:
+		_box(shop, (lo + hi) * 0.5, hi - lo, m)
+	var t := 0.03                                             ## board thickness
+	# --- the front section, between the arms
+	b.call(Vector3(-CAB_FH, CAB_TOP, CAB_FRONT - 0.03), Vector3(CAB_FH, 0.985, CAB_BACK), wood)                 ## countertop (under the shell's top)
+	b.call(Vector3(-CAB_FH, CAB_FLOOR - t, CAB_FRONT), Vector3(CAB_FH, CAB_FLOOR, CAB_BACK), wood)              ## display floor
+	b.call(Vector3(-CAB_FH, 0.06, CAB_FRONT), Vector3(CAB_FH, CAB_FLOOR - t, CAB_BACK - 0.01), dark)            ## cupboard body
+	b.call(Vector3(-CAB_FH, 0.0, CAB_FRONT), Vector3(CAB_FH, 0.06, CAB_BACK - 0.04), dark)                      ## recessed plinth
+	b.call(Vector3(-CAB_FH, CAB_TOP - 0.05, CAB_BACK - t), Vector3(CAB_FH, CAB_TOP, CAB_BACK), wood)            ## rail under the top
+	for x: float in [-CAB_FH, 0.0, CAB_FH]:                                                                     ## dividers, top to base
+		b.call(Vector3(x - t * 0.5, 0.06, CAB_FRONT), Vector3(x + t * 0.5, CAB_TOP, CAB_BACK), wood)
+	for bay: Array in [[-CAB_FH, 0.0], [0.0, CAB_FH]]:                                                          ## two doors a bay, knobs in the middle
+		var x0: float = bay[0] + t * 0.5
+		var x1: float = bay[1] - t * 0.5
+		var mid := (x0 + x1) * 0.5
+		for half: Array in [[x0, mid], [mid, x1]]:
+			b.call(Vector3(half[0] + 0.01, 0.09, CAB_BACK - 0.01), Vector3(half[1] - 0.01, CAB_FLOOR - t - 0.03, CAB_BACK + 0.004), door)
+		for kx: float in [mid - 0.03, mid + 0.03]:
+			b.call(Vector3(kx - 0.012, 0.36, CAB_BACK + 0.004), Vector3(kx + 0.012, 0.384, CAB_BACK + 0.02), brass)
+	# --- the corner pockets between the front section and each arm (kept behind the shell's angled glass corner)
+	for sd: float in [-1.0, 1.0]:
+		var c0 := minf(sd * CAB_FH, sd * 0.88)
+		var c1 := maxf(sd * CAB_FH, sd * 0.88)
+		b.call(Vector3(c0, CAB_TOP, -0.54), Vector3(c1, 0.985, CAB_BACK), wood)
+		b.call(Vector3(c0, CAB_FLOOR - t, -0.54), Vector3(c1, CAB_FLOOR, CAB_BACK), wood)
+		b.call(Vector3(c0, 0.06, -0.54), Vector3(c1, CAB_FLOOR - t, CAB_BACK), dark)
+	# --- the angled corners: cabinetry set at the shell's own corner angle, just inside its angled glass, joining the front to each arm
+	for sd: float in [-1.0, 1.0]:
+		var p0 := Vector2(sd * CAB_FH, CAB_FRONT)
+		var p1 := Vector2(sd * CAB_OUT, -0.47)
+		var d := p1 - p0
+		var inward := Vector2(-d.y, d.x).normalized()
+		if inward.y < 0.0:
+			inward = -inward                                 ## toward you, inside the counter
+		var depth := 0.2
+		var mid := (p0 + p1) * 0.5 + inward * depth * 0.5
+		var yaw := atan2(-d.y, d.x)
+		for slab: Array in [[CAB_TOP, 0.985, wood], [CAB_FLOOR - t, CAB_FLOOR, wood], [0.06, CAB_FLOOR - t, dark]]:
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(d.length(), float(slab[1]) - float(slab[0]), depth)
+			mi.mesh = bm
+			mi.material_override = slab[2]
+			mi.position = Vector3(mid.x, (float(slab[0]) + float(slab[1])) * 0.5, mid.y)
+			mi.rotation.y = yaw
+			shop.add_child(mi)
+	# --- each arm, an L from the front's corner to its back end
+	for sd: float in [-1.0, 1.0]:
+		var xin := sd * CAB_IN
+		var xout := sd * CAB_OUT
+		var lo_x := minf(xin, xout)
+		var hi_x := maxf(xin, xout)
+		b.call(Vector3(lo_x, CAB_TOP, CAB_ARM_FRONT - 0.03), Vector3(hi_x, 0.985, CAB_END), wood)                    ## countertop
+		b.call(Vector3(lo_x, CAB_FLOOR - t, CAB_ARM_FRONT), Vector3(hi_x, CAB_FLOOR, CAB_END), wood)                 ## display floor
+		b.call(Vector3(lo_x + (0.01 if sd > 0 else 0.0), 0.06, CAB_ARM_FRONT), Vector3(hi_x - (0.0 if sd > 0 else 0.01), CAB_FLOOR - t, CAB_END), dark)   ## cupboards
+		b.call(Vector3(lo_x + (0.04 if sd > 0 else 0.0), 0.0, CAB_ARM_FRONT), Vector3(hi_x - (0.0 if sd > 0 else 0.04), 0.06, CAB_END), dark)           ## plinth
+		b.call(Vector3(minf(xin, xin + sd * t), CAB_TOP - 0.05, CAB_BACK), Vector3(maxf(xin, xin + sd * t), CAB_TOP, CAB_END), wood)  ## rail under the top
+		b.call(Vector3(lo_x, 0.06, CAB_ARM_FRONT), Vector3(hi_x, CAB_TOP, CAB_ARM_FRONT + t), wood)                      ## the corner bay's far wall
+		for z: float in [0.21, CAB_END - t * 0.5]:                                                               ## dividers across the arm
+			b.call(Vector3(lo_x, 0.06, z - t * 0.5), Vector3(hi_x, CAB_TOP, z + t * 0.5), wood)
+		for bay: Array in [[CAB_BACK, 0.21], [0.21, CAB_END]]:                                                   ## doors on the arm's face toward you
+			var z0: float = bay[0] + t * 0.5
+			var z1: float = bay[1] - t * 0.5
+			var zm := (z0 + z1) * 0.5
+			for half: Array in [[z0, zm], [zm, z1]]:
+				b.call(Vector3(minf(xin, xin - sd * 0.004), 0.09, half[0] + 0.01), Vector3(maxf(xin, xin - sd * 0.004) + (0.0 if sd > 0 else 0.0), CAB_FLOOR - t - 0.03, half[1] - 0.01), door)
+			for kz: float in [zm - 0.03, zm + 0.03]:
+				b.call(Vector3(minf(xin - sd * 0.004, xin - sd * 0.02), 0.36, kz - 0.012), Vector3(maxf(xin - sd * 0.004, xin - sd * 0.02), 0.384, kz + 0.012), brass)
 
 ## A Timberline house-kit piece (assets/kit), stretched to `size` (x along it, y up, z through it), bottom at pos.y, centred on pos.
 ## A kit piece on a given render layer (the outside one for buildings in the town), toned like the shop's.
