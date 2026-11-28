@@ -67,6 +67,30 @@ NÜRNBERG", "ink": "printed", "tex": "toy_car/brandt", "w": 0.08, "face": "botto
 			{"id": "litho", "from": "left", "at": Vector2(0.1, 0.1), "pos": Vector3(0.0, 0.02, 0.03), "text": "The paint is printed on the tin before it was folded: the pattern runs unbroken into the seams. Proper German tinwork.", "mult": 1.25},
 		],
 	},
+	"candlestick_phone": {
+		"name": "Candlestick telephone", "cat": "household", "base": 140, "fake_value": 12,
+		"clues": [
+			{"id": "plate", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.1, 0), "text": "A nickel plate under the base: \"Northern Bell, No. 20\". The telephone company's own desk set, from before the dial.", "mult": 1.6, "label": "NORTHERN BELL\nNo. 20", "ink": "struck", "tex": "candlestick_phone/northern_bell", "w": 0.08, "face": "bottom"},
+			{"id": "earpiece", "from": "left", "at": Vector2(0.0, 0.1), "pos": Vector3(-0.05, 0.0, 0.0), "text": "The earpiece is hard black rubber, gone brown at the edges with age: the original.", "mult": 1.15},
+			{"id": "dent", "from": "front", "at": Vector2(0.05, 0.62), "pos": Vector3(0.0, 0.08, 0.03), "text": "A dent in the mouthpiece's rim: it has been knocked off a desk.", "mult": 0.8, "damage": true, "part": "dent"},
+		],
+	},
+	"dog_bank": {
+		"name": "Cast-iron dog bank", "cat": "toys", "base": 125, "fake_value": 10,
+		"clues": [
+			{"id": "mark", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.1, 0), "text": "Cast into the base: \"Halvorsen Iron, Pat. 1888\". One of the old foundry banks.", "mult": 1.7, "label": "HALVORSEN IRON\nPAT. 1888", "ink": "embossed", "tex": "dog_bank/halvorsen", "w": 0.09, "face": "bottom"},
+			{"id": "slot", "from": "top", "at": Vector2(0.15, 0.1), "pos": Vector3(0.0, 0.08, 0.0), "text": "The coin slot is worn bright and smooth: years of pennies went in here.", "mult": 1.15},
+			{"id": "dent", "from": "front", "at": Vector2(0.35, -0.72), "pos": Vector3(0.03, -0.08, 0.04), "text": "The base has been dropped: a dent along its edge.", "mult": 0.8, "damage": true, "part": "dent"},
+		],
+	},
+	"duck_decoy": {
+		"name": "Duck decoy", "cat": "folk art", "base": 110, "fake_value": 9,
+		"clues": [
+			{"id": "signature", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.06, 0), "text": "Branded into the wood underneath: \"W. Pike, 1921\". Walt Pike carved for the duck hunters on the lake below town.", "mult": 1.9, "label": "W. PIKE\n1921", "ink": "carved", "tex": "duck_decoy/w_pike", "w": 0.08, "face": "bottom"},
+			{"id": "eyes", "from": "left", "at": Vector2(-0.5, 0.35), "pos": Vector3(-0.08, 0.04, 0.0), "text": "Glass eyes, set in by hand, and real wear on the paint where it rode in a hunter's sack.", "mult": 1.15},
+			{"id": "neck", "from": "top", "at": Vector2(-0.45, 0.0), "pos": Vector3(-0.06, 0.06, 0.0), "text": "The head was snapped off at the neck and glued back on.", "mult": 0.75, "damage": true, "part": "glue"},
+		],
+	},
 	"jug": {
 		"name": "Stoneware jug", "cat": "household", "base": 55, "fake_value": 6,
 		"clues": [
@@ -86,11 +110,29 @@ NÜRNBERG", "ink": "printed", "tex": "toy_car/brandt", "w": 0.08, "face": "botto
 ## mark itself gives it away ("" when it does not), "tell": a fake clue elsewhere {from, at, text, part, part_text} or {}, "tint", "gloss"}.
 const MARK_IDS := ["mark", "hallmark", "signature", "maker", "stamp", "lens", "plate", "crown"]
 const COPIES := {
+	"candlestick_phone": [
+		{"label": "", "ink": "struck", "mark_text": "", "tell": {"from": "bottom", "at": Vector2(0.5, -0.4), "part": "screws", "text": "Cross-head screws hold the base plate on. The telephone works used slotted screws; these are new."}, "tint": Color(1.0, 0.95, 0.95), "gloss": -1.0},
+		{"label": "", "ink": "struck", "mark_text": "", "tell": {"from": "right", "at": Vector2(0.0, 0.0), "part": "seam_short", "text": "A moulding seam runs up the stand: it's cast plastic painted black, not lacquered brass."}, "tint": Color(0.9, 0.9, 0.95), "gloss": 0.3},
+		{"label": "", "ink": "struck", "mark_text": "", "tell": {"from": "front", "at": Vector2(0.0, -0.5), "part": "brassy", "text": "The brass showing through the black is painted on: flat even blotches, not worn edges."}, "tint": Color(1.05, 1.0, 0.92), "gloss": -1.0},
+		{"label": "", "ink": "struck", "mark_text": "", "tell": {"from": "back", "at": Vector2(0.0, -0.2), "part": "welds", "text": "Spot welds where the stand meets the base: a telephone works would have screwed it together."}, "tint": Color(0.92, 0.92, 0.98), "gloss": -1.0},
+	],
+	"dog_bank": [
+		{"label": "", "ink": "embossed", "mark_text": "", "tell": {"from": "right", "at": Vector2(0.0, 0.1), "part": "seam_short", "text": "A fine moulding seam down the dog's side: it's resin, not iron. Far too light in the hand, too."}, "tint": Color(1.05, 1.0, 0.95), "gloss": 0.25},
+		{"label": "", "ink": "embossed", "mark_text": "", "tell": {"from": "front", "at": Vector2(-0.2, -0.1), "part": "rust", "text": "The rust and wear are painted on in flat blotches: nothing has worn through to the iron."}, "tint": Color(1.08, 1.02, 0.95), "gloss": -1.0},
+		{"label": "", "ink": "embossed", "mark_text": "", "tell": {"from": "bottom", "at": Vector2(0.5, 0.4), "part": "screws", "text": "A cross-head screw holds the two halves together. The old foundries used a single slotted bolt."}, "tint": Color(0.95, 0.95, 1.0), "gloss": -1.0},
+		{"label": "", "ink": "embossed", "mark_text": "", "tell": {"from": "back", "at": Vector2(0.0, -0.4), "part": "glaze", "text": "The red of the base is bright, glossy and even: new paint over a cheap casting."}, "tint": Color(1.12, 1.0, 0.98), "gloss": 0.15},
+	],
+	"duck_decoy": [
+		{"label": "", "ink": "carved", "mark_text": "", "tell": {"from": "right", "at": Vector2(0.2, 0.1), "part": "grooves", "text": "The feather cuts on the back are all exactly alike: cut by a machine, not a carver's knife."}, "tint": Color(1.0, 1.0, 0.95), "gloss": -1.0},
+		{"label": "", "ink": "carved", "mark_text": "", "tell": {"from": "front", "at": Vector2(0.2, -0.2), "part": "chips", "text": "The chipped paint is painted on: the 'chips' are flat blotches, with no bare wood under them."}, "tint": Color(1.06, 1.0, 0.92), "gloss": -1.0},
+		{"label": "", "ink": "carved", "mark_text": "", "tell": {"from": "bottom", "at": Vector2(0.5, 0.4), "part": "stain", "text": "The bottom is stained with tea to look old, but the wood under the stain is fresh and pale."}, "tint": Color(1.1, 1.05, 0.95), "gloss": -1.0},
+		{"label": "", "ink": "carved", "mark_text": "", "tell": {"from": "left", "at": Vector2(0.3, -0.3), "part": "seam_short", "text": "A moulding seam along the body: it's cast resin, not carved cedar. It wouldn't float."}, "tint": Color(0.95, 0.95, 0.9), "gloss": 0.3},
+	],
 	"toy_car": [
 		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "bottom", "at": Vector2(0.45, -0.35), "part": "screws", "text": "Cross-head screws hold the base on. The old German toy works folded tin tabs to close a car; never screws."}, "tint": Color(1.08, 0.98, 0.95), "gloss": -1.0},
 		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "left", "at": Vector2(0.0, -0.2), "part": "welds", "text": "A row of spot welds along the body: tin toys were folded and tabbed, not welded. A cheap new copy."}, "tint": Color(0.95, 0.95, 1.0), "gloss": -1.0},
-		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "top", "at": Vector2(0.1, 0.0), "part": "paint", "text": "The wear is painted on: even flat blotches of rust colour, not real rubbed-through tin."}, "tint": Color(1.05, 1.0, 0.92), "gloss": -1.0},
-		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "right", "at": Vector2(0.0, 0.1), "part": "seam", "text": "A moulding seam runs down the body: it isn't tin at all, it's painted plastic."}, "tint": Color(1.1, 0.9, 0.9), "gloss": 0.3},
+		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "top", "at": Vector2(0.1, 0.0), "part": "rust", "text": "The wear is painted on: even flat blotches of rust colour, not real rubbed-through tin."}, "tint": Color(1.05, 1.0, 0.92), "gloss": -1.0},
+		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "right", "at": Vector2(0.0, 0.1), "part": "seam_short", "text": "A moulding seam runs down the body: it isn't tin at all, it's painted plastic."}, "tint": Color(1.1, 0.9, 0.9), "gloss": 0.3},
 	],
 	"music_box": [
 		{"label": "LINDQVIST", "ink": "printed", "tex": "music_box/lindqvist_printed", "mark_text": "A printed paper label glued underneath, not a stamp struck into the wood: a modern copy.", "tell": {}, "tint": Color(1.1, 1.02, 0.9), "gloss": -1.0},
@@ -108,7 +150,7 @@ const COPIES := {
 		{"label": "", "ink": "carved", "mark_text": "", "tell": {"from": "right", "at": Vector2(0.0, 0.1), "part": "grooves", "text": "The knife cuts are all the same depth and spacing: machine-carved, then roughened by hand."}, "tint": Color(1.14, 1.05, 0.9), "gloss": -1.0},
 		{"label": "E.H. 1952", "ink": "carved", "tex": "carved_bear/eh_1952", "mark_text": "Signed \"E.H. 1952\". Eli Harlan died in 1949.", "tell": {}, "tint": Color(0.9, 0.85, 0.8), "gloss": -1.0},
 		{"label": "E.K.", "ink": "carved", "tex": "carved_bear/ek", "mark_text": "The initials are \"E.K.\", not Eli Harlan's \"E.H.\".", "tell": {}, "tint": Color(1.0, 0.92, 0.82), "gloss": -1.0},
-		{"label": "", "ink": "carved", "mark_text": "", "tell": {"from": "back", "at": Vector2(0.0, 0.2), "part": "seam", "text": "It's resin, not wood: cold, too light, with a mould seam down its back."}, "tint": Color(0.8, 0.7, 0.62), "gloss": 0.2},
+		{"label": "", "ink": "carved", "mark_text": "", "tell": {"from": "back", "at": Vector2(0.0, 0.2), "part": "seam_short", "text": "It's resin, not wood: cold, too light, with a mould seam down its back."}, "tint": Color(0.8, 0.7, 0.62), "gloss": 0.2},
 	],
 	"compass": [
 		{"label": "", "ink": "engraved", "mark_text": "", "tell": {"from": "bottom", "at": Vector2(0.45, -0.4), "part": "paint", "text": "The green patina rubs off on your finger: painted on to look old."}, "tint": Color(0.9, 1.05, 0.9), "gloss": -1.0},
@@ -125,7 +167,7 @@ const COPIES := {
 	"camera": [
 		{"label": "TESSAR?", "ink": "engraved", "tex": "camera/tessar_q", "mark_text": "The ring says \"TESSAR\" and then nothing: no aperture, no serial. Zeiss engraved both. The lens is plastic.", "tell": {}, "tint": Color(1.1, 1.05, 1.0), "gloss": 0.3},
 		{"label": "TESAR 1:4.5", "ink": "engraved", "tex": "camera/tesar_145", "mark_text": "\"Tesar\" with one S: a fake lens ring.", "tell": {}, "tint": Color(0.9, 0.9, 1.0), "gloss": -1.0},
-		{"label": "", "ink": "engraved", "mark_text": "", "tell": {"from": "right", "at": Vector2(-0.4, 0.35), "part": "seam", "text": "The bellows are vinyl, not leather: no cracks at the folds, and a moulded seam along them."}, "tint": Color(1.0, 0.9, 0.85), "gloss": 0.25},
+		{"label": "", "ink": "engraved", "mark_text": "", "tell": {"from": "right", "at": Vector2(-0.4, 0.35), "part": "seam_short", "text": "The bellows are vinyl, not leather: no cracks at the folds, and a moulded seam along them."}, "tint": Color(1.0, 0.9, 0.85), "gloss": 0.25},
 		{"label": "", "ink": "engraved", "mark_text": "", "tell": {"from": "bottom", "at": Vector2(0.0, 0.0), "part": "screws", "text": "A plastic tripod socket held in with cross-head screws: put together recently."}, "tint": Color(0.8, 0.82, 0.88), "gloss": -1.0},
 	],
 	"snow_globe": [

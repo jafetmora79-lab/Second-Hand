@@ -197,6 +197,10 @@ def main():
     save("pocket_watch/serials", drawn_letters("31840 · 77215", serif, 44, col2), 256)
     # the tin toy car's maker, printed on its tin: a stand-in drawn here until the batch-7 mark atlas (docs/CHATGPT_PROMPTS.md) arrives
     save("toy_car/brandt", drawn_letters("BRANDT · NÜRNBERG", serif, 44, (236, 222, 186)), 256)
+    # the same, for the telephone's nickel plate, the dog bank's cast letters and the decoy's brand
+    save("candlestick_phone/northern_bell", drawn_letters("NORTHERN BELL · No. 20", serif, 44, (214, 208, 196)), 256)
+    save("dog_bank/halvorsen", drawn_letters("HALVORSEN IRON · PAT. 1888", serif, 44, (150, 140, 128)), 256)
+    save("duck_decoy/w_pike", drawn_letters("W. PIKE 1921", serif_i, 48, (62, 36, 20)), 256)
 
 
 if __name__ == "__main__":

@@ -317,10 +317,13 @@ static func _part_at(root: Node3D, kind: String, pos: Vector3, n: Vector3, text:
 				_bit(f, _box(0.022, 0.0018, 0.0012), Vector3(0, -0.012 + k * 0.006, 0), _mat(Color(0.3, 0.18, 0.09), 0.9))
 		"seam":                                                    ## a moulding seam: a fine raised line
 			_bit(f, _box(0.0016, 0.075, 0.0016), Vector3.ZERO, _mat(Color(0.75, 0.68, 0.58), 0.3))
-		"paint":                                                   ## patina painted on in flat even blotches
-			var green := _mat(Color(0.32, 0.56, 0.38), 0.95)
+		"seam_short":                                              ## the same on a small rounded piece, where a long one would stand off the curve
+			_bit(f, _box(0.0014, 0.026, 0.0012), Vector3.ZERO, _mat(Color(0.75, 0.68, 0.58), 0.3))
+		"paint", "rust", "brassy", "chips":                        ## patina, rust, worn brass or chipped paint, painted on in flat even blotches
+			var col := {"paint": Color(0.32, 0.56, 0.38), "rust": Color(0.46, 0.24, 0.12), "brassy": Color(0.72, 0.56, 0.28), "chips": Color(0.82, 0.72, 0.55)}[kind] as Color
+			var flat := _mat(col, 0.95)
 			for k in 3:
-				_bit(f, _cyl(0.009 - k * 0.002, 0.009 - k * 0.002, 0.0006, 14), Vector3(k * 0.009 - 0.009, k * 0.004 - 0.004, 0), green, Vector3(PI * 0.5, 0, 0))
+				_bit(f, _cyl(0.009 - k * 0.002, 0.009 - k * 0.002, 0.0006, 14), Vector3(k * 0.009 - 0.009, k * 0.004 - 0.004, 0), flat, Vector3(PI * 0.5, 0, 0))
 		"bubble":                                                  ## an air bubble in the liquid under the glass
 			var b := _mat(Color(0.9, 0.95, 1.0, 0.5), 0.05)
 			b.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
