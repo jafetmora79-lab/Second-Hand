@@ -9,7 +9,7 @@ const COUNTER_TOP := 1.0                   ## the glass counter's top, 2.4 m wid
 const WING_X := 1.0                        ## the counter's side wings (a U round you): their middles, either side of you
 const WING_Z := 0.22
 const WING_LEN := 0.88
-const MAT := Vector3(0.0, 1.025, -0.5)     ## the velvet mat, behind the security screens on your side
+const MAT := Vector3(0.0, 1.025, -0.57)    ## the velvet mat, on the U counter's front section (z -0.72..-0.42)
 const CUSTOMER_SPOT := Vector3(0.0, 0.0, -1.45)
 const DOOR := Vector3(-2.2, 0.0, -3.9)
 const DOOR_W := 0.92                       ## the opening in the kit's doorway wall, at 3 m wide and 2.95 m tall
@@ -94,9 +94,8 @@ static func build(root: Node3D) -> Dictionary:
 	var case_spots := _glass_counter(shop)
 	# the counter's two wings coming back toward you, a U round where you stand (Timberline's plain counter, the same height as the
 	# glass case): the security monitor on the left wing, the restoration bench on the right
-	for side: float in [-1.0, 1.0]:
-		_kit(shop, "HK_counter", Vector3(side * WING_X, 0, WING_Z), side * PI * 0.5, Vector3(WING_LEN, COUNTER_TOP, 0.6))
-	_box(shop, Vector3(0, COUNTER_TOP + 0.006, MAT.z), Vector3(0.62, 0.01, 0.42), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
+	## (the U counter's own arms are the wings now: see _glass_counter)
+	_box(shop, Vector3(0, COUNTER_TOP + 0.006, MAT.z), Vector3(0.62, 0.01, 0.28), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
 	# the warm light on the mat, from your right so nothing stands between you and the customer; a wall lantern by the window
 	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.72), 0.36, -PI * 0.5)       ## plate on the back wall beside the window
 	for side: float in [-1.0, 1.0]:                                                     ## one on each side wall, by the counter
@@ -219,7 +218,7 @@ static func _furnish(shop: Node3D) -> Dictionary:
 	rug.position = Vector3(0, 0.008, -2.3)
 	shop.add_child(rug)
 	# the ledger, open on the counter left of the mat
-	_prop(shop, "shop/ledger", Vector3(-0.66, COUNTER_TOP, -0.42), 0.0, 0.3, 1, Vector3(0.32, 0.0, 0.0))
+	_prop(shop, "shop/ledger", Vector3(-0.62, COUNTER_TOP, -0.57), 0.0, 0.3, 1, Vector3(0.32, 0.0, 0.0))
 	# the banker's lamp right of the mat: its pull chain is a separate part (tools/split_props.py) so it can be pulled
 	var lamp := _prop(shop, "shop/bankers_lamp_parts", Vector3(0.74, COUNTER_TOP, -0.5), 0.32, -0.55)
 	var chain: Node3D = null
@@ -298,6 +297,8 @@ const STOVE_YAW := 0.0                     ## the stove's door faces the room
 ## Its glass is made see-through by a shader (shaders/glass_case.gdshader). Returns the spots inside the case for the shop's collection.
 static func _glass_counter(shop: Node3D) -> Array:
 	var spots: Array = []
+	if ResourceLoader.exists("res://assets/shop/counter_u.glb"):
+		return _u_counter(shop)
 	var n := _prop(shop, "shop/counter_glass", Vector3(0, 0, COUNTER_Z), 0.0, PI, 1, Vector3(2.4, 0, 0))
 	if n == null:
 		_kit(shop, "HK_counter", Vector3(0, 0, COUNTER_Z), 0.0, Vector3(2.4, COUNTER_TOP, 0.8))
@@ -314,6 +315,30 @@ static func _glass_counter(shop: Node3D) -> Array:
 			m.set_surface_override_material(i, g)
 	for x: float in [-0.95, -0.65, -0.35, 0.35, 0.65, 0.95]:
 		spots.append(Vector3(x, 0.56, COUNTER_Z - 0.08))
+	return spots
+
+## The U-shaped counter (Meshy, from the user's image): the glass case in front of you, an arm either side coming back toward you
+## (the monitor on the left arm, the restoration bench on the right). Its painted glass is made see-through and its security screens
+## squashed below the eye line by the glass_case shader. Returns the spots inside the case for the shop's own collection.
+const U_SIZE := Vector3(2.6, 1.541, 1.6)    ## fitted so its countertop is at COUNTER_TOP
+const U_Z := 0.06
+static func _u_counter(shop: Node3D) -> Array:
+	var n := _prop(shop, "shop/counter_u", Vector3(0, 0, U_Z), 0.0, 0.0, 1, U_SIZE)
+	var sh := load("res://shaders/glass_case.gdshader") as Shader
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var src := m.get_active_material(i) as BaseMaterial3D
+			var g := ShaderMaterial.new()
+			g.shader = sh
+			if src != null:
+				g.set_shader_parameter("tex", src.albedo_texture)
+			g.set_shader_parameter("top_y", Vector2(9.0, 9.0))               ## its top is solid wood
+			g.set_shader_parameter("screen_base", 0.075)        ## just above its countertop (model space)
+			m.set_surface_override_material(i, g)
+	var spots: Array = []
+	for x: float in [-0.95, -0.65, -0.35, 0.35, 0.65, 0.95]:
+		spots.append(Vector3(x, 0.56, -0.62))
 	return spots
 
 ## A Timberline house-kit piece (assets/kit), stretched to `size` (x along it, y up, z through it), bottom at pos.y, centred on pos.
