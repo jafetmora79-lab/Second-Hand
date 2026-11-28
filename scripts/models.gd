@@ -46,6 +46,10 @@ static func build(item: Dictionary) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Item"
 	var path := "res://assets/items/%s.glb" % item["kind"]
+	var parts_path := "res://assets/items/%s_parts.glb" % item["kind"]      ## the same model cut into moving parts (tools/split_items.py)
+	var living: Living = null
+	if ResourceLoader.exists(parts_path):
+		path = parts_path
 	var tris := PackedVector3Array()
 	if ResourceLoader.exists(path):
 		var model := (load(path) as PackedScene).instantiate() as Node3D
@@ -54,6 +58,14 @@ static func build(item: Dictionary) -> Node3D:
 		_tint(model, item.get("tint", Color.WHITE), float(item.get("gloss", -1.0)))
 		if item["kind"] == "snow_globe":
 			SnowGlobe.build(model)                               ## glass dome, a scene inside and moving snow on the Meshy base
+		var data_path := "res://assets/items/%s_parts.json" % item["kind"]
+		if path == parts_path and ResourceLoader.exists(data_path):
+			var data = (load(data_path) as JSON).data
+			if data is Dictionary:
+				living = Living.new()
+				living.name = "Living"
+				root.add_child(living)
+				living.setup(root, model, data)
 		tris = _aim_clues(root, model, item["clues"])
 		if item.has("wear_seed"):
 			_wear(root, tris, int(item["wear_seed"]))
@@ -71,6 +83,11 @@ static func build(item: Dictionary) -> Node3D:
 		cs.shape = m.mesh.create_trimesh_shape()
 		cs.transform = root.global_transform.affine_inverse() * m.global_transform if m.is_inside_tree() else _rel(root, m)
 		body.add_child(cs)
+		if living != null and m.has_meta("living_part"):        ## a lid or a chain: its shape moves with it
+			cs.set_meta("living_part", m.get_meta("living_part"))
+			for p: Dictionary in living.parts:
+				if p["node"] == m:
+					p["shape"] = cs
 	root.add_child(body)
 	return root
 
@@ -255,12 +272,6 @@ static func _part_at(root: Node3D, kind: String, pos: Vector3, n: Vector3, text:
 	var steel := _mat(Color(0.62, 0.62, 0.64), 0.35, 0.8)
 	var dark := _mat(Color(0.08, 0.07, 0.06), 0.8)
 	match kind:
-		"teeth":                                                   ## the music box comb: a row of steel teeth with two gone
-			_bit(f, _box(0.05, 0.004, 0.0015), Vector3(0, -0.008, 0), steel)
-			for k in 11:
-				if k == 4 or k == 5:
-					continue
-				_bit(f, _box(0.0025, 0.012, 0.0012), Vector3(-0.022 + k * 0.0044, 0.0, 0), steel)
 		"crack":                                                   ## a hairline crack in glass: a fine pale zigzag
 			var pale := _mat(Color(0.95, 0.97, 1.0, 0.8), 0.1)
 			pale.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

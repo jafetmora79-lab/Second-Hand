@@ -888,11 +888,19 @@ func _unhandled_input(event: InputEvent) -> void:
 				turn_item("flip")
 			KEY_R:
 				turn_item("reset")
+			KEY_E:
+				var lv := _living()
+				if lv != null:
+					lv.toggle()                              ## open or shut every lid and cover
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			dragging = mb.pressed
+			if mb.pressed:
+				_press_at = mb.position
+			elif mb.position.distance_to(_press_at) < 6.0:
+				_click_part(mb.position)                     ## a click, not a drag: open or shut the lid under the mouse
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
 			zoom = clampf(zoom - 0.06, 0.28, 1.0)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
@@ -902,6 +910,30 @@ func _unhandled_input(event: InputEvent) -> void:
 		## left-right spins it like a turntable (around the true vertical, so it never rolls sideways); up-down tips it toward you
 		var right := cam.global_transform.basis.x
 		want_q = (Quaternion(Vector3.UP, mm.relative.x * 0.008) * Quaternion(right, mm.relative.y * 0.008) * want_q).normalized()
+
+var _press_at := Vector2.ZERO
+
+## The piece's moving parts, if it has any.
+func _living() -> Living:
+	if item_node == null or not is_instance_valid(item_node):
+		return null
+	return item_node.get_node_or_null("Living") as Living
+
+## Opens or shuts the lid (or the watch's cover) the mouse is on.
+func _click_part(mp: Vector2) -> void:
+	var lv := _living()
+	if lv == null:
+		return
+	var from := cam.project_ray_origin(mp)
+	var q := PhysicsRayQueryParameters3D.create(from, from + cam.project_ray_normal(mp) * 3.0)
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty():
+		return
+	var body := hit["collider"] as CollisionObject3D
+	var owner_id := body.shape_find_owner(int(hit["shape"]))
+	var pname := Living.part_of(body.shape_owner_get_owner(owner_id) as Node)
+	if pname != "":
+		lv.toggle(pname)
 
 # ---- haggling ----------------------------------------------------------------------------------------------------------------------
 

@@ -10,7 +10,7 @@ const KINDS := {
 		"name": "Music box", "cat": "curios", "base": 180, "fake_value": 15,
 		"clues": [
 			{"id": "mark", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.075, 0), "text": "Struck into the wood underneath: \"J. Lindqvist, Oslo 1904\". A known maker.", "mult": 1.6, "label": "J.LINDQVIST\nOSLO 1904", "ink": "struck", "tex": "music_box/lindqvist_struck", "w": 0.085, "face": "bottom"},
-			{"id": "comb", "from": "top", "at": Vector2(0.0, 0.15), "pos": Vector3(0.05, 0.06, 0.0), "text": "The steel comb is missing two teeth: it plays, but not every note.", "mult": 0.7, "damage": true, "part": "teeth"},
+			{"id": "comb", "from": "top", "at": Vector2(-0.15, 0.35), "pos": Vector3(-0.021, 0.0, 0.048), "text": "The steel comb is missing two teeth: it plays, but not every note.", "mult": 0.7, "damage": true, "tex": "music_box/comb_gap", "w": 0.022},
 			{"id": "inlay", "from": "front", "at": Vector2(0.0, -0.35), "pos": Vector3(0.0, 0.08, 0.06), "text": "The flower inlay is real pearwood, cut by hand.", "mult": 1.15},
 		],
 	},

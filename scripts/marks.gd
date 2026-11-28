@@ -93,7 +93,15 @@ static func _near(tris: PackedVector3Array, p: Vector3, r: float) -> PackedVecto
 	var out := PackedVector3Array()
 	var r2 := r * r
 	for i in range(0, tris.size(), 3):
-		if tris[i].distance_squared_to(p) < r2 or tris[i + 1].distance_squared_to(p) < r2 or tris[i + 2].distance_squared_to(p) < r2:
+		var a := tris[i]
+		var b := tris[i + 1]
+		var c := tris[i + 2]
+		var near := a.distance_squared_to(p) < r2 or b.distance_squared_to(p) < r2 or c.distance_squared_to(p) < r2
+		if not near:                                        ## a big triangle (a flat plate, a floor) with every corner far off but `p` over it
+			var lo := a.min(b).min(c) - Vector3.ONE * r
+			var hi := a.max(b).max(c) + Vector3.ONE * r
+			near = p.x >= lo.x and p.y >= lo.y and p.z >= lo.z and p.x <= hi.x and p.y <= hi.y and p.z <= hi.z
+		if near:
 			out.append(tris[i])
 			out.append(tris[i + 1])
 			out.append(tris[i + 2])

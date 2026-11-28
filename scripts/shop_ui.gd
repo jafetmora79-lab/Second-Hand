@@ -307,7 +307,7 @@ func _build_hint() -> void:
 	_hint.visible = false
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hint)
-	var l := UiStyle.text_label("Drag: turn    Scroll: zoom    F: flip    R: reset", 13, UiStyle.CREAM)
+	var l := UiStyle.text_label("Drag: turn    Scroll: zoom    F: flip    R: reset    Click lid or E: open/shut", 13, UiStyle.CREAM)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.add_child(l)
 

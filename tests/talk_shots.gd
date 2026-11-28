@@ -16,6 +16,7 @@ func snap(n: String) -> void:
 	root.get_viewport().get_texture().get_image().save_png("res://tools/shots/talk_%s.png" % n)
 func run() -> void:
 	var g: Node3D = (load("res://main.tscn") as PackedScene).instantiate()
+	g.cinematics = false
 	root.add_child(g)
 	await wait_state(g, "at_door", 30.0)
 	await wait(0.5)
@@ -41,6 +42,10 @@ func run() -> void:
 	g.ui.refresh_inspect(g.item)
 	await wait(1.0)
 	await snap("inspect")
+	g.want_q = Quaternion(Vector3.RIGHT, 0.8) * g.want_q
+	g.zoom = 0.3
+	await wait(1.5)
+	await snap("inspect_comb")
 	g.start_haggle()
 	await wait(0.6)
 	await snap("haggle")
