@@ -2,6 +2,8 @@ extends Node
 class_name Living
 ## The moving parts of a piece on the mat (from tools/split_items.py: <kind>_parts.glb and .json):
 ## - hinges (the music box's lid, the compass's lid, the pocket watch's cover) open and close when you click them or press E;
+##   The same blend moves parts with no hinge: the coffee grinder's drawer slides, the kettle's lid lifts and tips, and the spyglass's
+##   cap comes off its chain and fits over the lens (it turns, shrinks to the lens and swings over in a small arc on the way);
 ## - a chain (the watch's) hangs from its top link and swings as you turn the piece: it lags behind the turn, then settles back
 ##   toward hanging straight down, never swinging further than a real chain could from where it lies.
 ## Each part's collision shape follows it, so the loupe and clicks always meet the part where you see it.
@@ -33,15 +35,36 @@ func setup(item_root: Node3D, model: Node3D, data: Dictionary) -> void:
 			var off: Array = d.get("offset", [0.0, 0.0, 0.0])
 			p["offset"] = Vector3(off[0], off[1], off[2])       ## the small shift that seats it exactly once shut
 			p["rest_pos"] = node.position
-			p["t"] = 0.0
-			p["target"] = 0.0
+			p["scale"] = float(d.get("scale", 1.0))              ## the spyglass's cap, sized to the lens
+			p["arc"] = float(d.get("arc", 0.0))                  ## lifted this high on the way, so it clears what it passes
+			p["t"] = float(d.get("start", 0.0))                  ## the drawer starts shut
+			p["target"] = p["t"]
+			_pose(p)
 		else:
+			p["parent"] = String(d.get("parent", ""))           ## the spyglass cap's chain hangs from the cap and goes where it goes
+			var an: Array = d.get("anchor", [])
+			if an.size() == 3:
+				p["anchor"] = Vector3(an[0], an[1], an[2])          ## ...and, with the cap on, runs back to its lug on the tube
+				p["model"] = node.get_parent()
 			var h: Array = d["hang"]
 			p["hang"] = Vector3(h[0], h[1], h[2]).normalized()
 			p["d"] = p["hang"]
 			p["w"] = Vector3.ZERO
 		parts.append(p)
 		node.set_meta("living_part", pname)
+	for p: Dictionary in parts:
+		if p["type"] == "chain" and p["parent"] != "":
+			for q: Dictionary in parts:
+				if q["name"] == p["parent"]:
+					var ch: Node3D = p["node"]
+					var cap: Node3D = q["node"]
+					var tf := cap.transform.affine_inverse() * ch.transform     ## (siblings: the same place, now relative to the cap)
+					ch.owner = null
+					ch.get_parent().remove_child(ch)
+					cap.add_child(ch)
+					ch.transform = tf
+					p["rest"] = (p["node"] as Node3D).transform.basis
+					p["owner"] = q
 
 ## True if the piece has anything that opens.
 func has_hinges() -> bool:
@@ -72,12 +95,19 @@ func _process(delta: float) -> void:
 				continue
 			t = move_toward(t, target, delta / HINGE_TIME)
 			p["t"] = t
-			var eased := t * t * (3.0 - 2.0 * t)
-			node.transform.basis = Basis(p["axis"], float(p["closed"]) * eased) * (p["rest"] as Basis)
-			node.position = (p["rest_pos"] as Vector3) + (p["offset"] as Vector3) * eased
+			_pose(p)
 		else:
 			_swing(p, delta)
 		_follow(p)
+
+## A hinged (or sliding, lifting, placed) part at its blend `t`.
+func _pose(p: Dictionary) -> void:
+	var node: Node3D = p["node"]
+	var t: float = p["t"]
+	var eased := t * t * (3.0 - 2.0 * t)
+	var sc := lerpf(1.0, float(p["scale"]), eased)
+	node.transform.basis = Basis(p["axis"], float(p["closed"]) * eased) * (p["rest"] as Basis).scaled(Vector3.ONE * sc)
+	node.position = (p["rest_pos"] as Vector3) + (p["offset"] as Vector3) * eased + Vector3.UP * float(p["arc"]) * sin(PI * eased)
 
 ## The chain: a damped pendulum about its top link, in its parent's space. Its state is the way it hangs (`d`), with no twist about
 ## itself, so it always stays on the bow; at rest, with the piece upright, it hangs just as it was modelled.
@@ -98,19 +128,31 @@ func _swing(p: Dictionary, delta: float) -> void:
 	var target := hang0
 	if g.dot(Vector3.DOWN) > -0.98:
 		target = (Quaternion(Vector3.DOWN, g) * hang0).normalized()
+	var own: Dictionary = p.get("owner", {})
+	var lift := 0.0                                            ## how far its cap has gone toward the lens: off the table, it just hangs
+	var unscale := 1.0
+	if not own.is_empty():
+		var ot: float = own["t"]
+		lift = ot * ot * (3.0 - 2.0 * ot)
+		var to := g
+		if p.has("anchor"):
+			var lug: Vector3 = (p["model"] as Node3D).global_transform * (p["anchor"] as Vector3)
+			to = (pq.inverse() * (lug - node.global_position)).normalized()
+		target = target.slerp(to, lift).normalized()
+		unscale = 1.0 / lerpf(1.0, float(own["scale"]), lift)   ## the cap grows to fit the lens; its chain stays its own size
 	w += d.cross(target) * CHAIN_PULL * delta
 	w *= exp(-CHAIN_DAMP * delta)
 	if w.length() > 0.0001:
 		d = (Quaternion(w.normalized(), w.length() * delta) * d).normalized()
 	# a chain lies on the case and the mat: it can't swing all the way round
 	var off := d.angle_to(hang0)
-	if off > CHAIN_REACH:
+	if off > CHAIN_REACH and lift < 0.5:
 		d = hang0.slerp(d, CHAIN_REACH / off).normalized()
 		w *= 0.4
 	p["d"] = d
 	p["w"] = w
 	var q := Quaternion(hang0, d) if hang0.dot(d) > -0.999 else Quaternion.IDENTITY
-	node.transform.basis = Basis(q) * (p["rest"] as Basis)
+	node.transform.basis = (Basis(q) * (p["rest"] as Basis)).scaled(Vector3.ONE * unscale)
 
 ## A part's collision shape goes where the part is now.
 func _follow(p: Dictionary) -> void:

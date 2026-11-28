@@ -16,6 +16,8 @@ ITEMS = os.path.join(ROOT, "assets", "items")
 
 WATCH_BODY = "(y > 0.1 and ((((x+0.05)**2+(z+0.05)**2)**0.5 < 0.335 and x < 0.265) or (abs(x+0.03) < 0.15 and z > 0.2)))"
 # per kind: parts in Blender coordinates (Z up). A hinge closes about `axis` until the part lies flat across `normal` at `cap`.
+SPY_LUG = Vector((-0.13, -0.425, 0.0))       ## where the cap's chain is fixed to the tube
+SPY_CAP = "((x + 0.2) ** 2 + (y + 0.26) ** 2) ** 0.5 < 0.097 and z < -0.075"
 SPEC = {
     "music_box": {"unstack": True, "unstack_gap": 0.016, "unstack_sink": 0.012, "keep": "dark", "unstack_where": "(abs(x) > 0.41 or y < -0.41 or z < -0.38 or y > 0.38) and z < -0.03", "parts": [   ## the inlaid outer panels only; its inlays are the darker layer
         {"name": "Lid", "pick": "z > -0.02 and y > 0.15", "type": "hinge", "axis": "X", "normal": Vector((0, 0, 1))},
@@ -26,6 +28,20 @@ SPEC = {
     "pocket_watch": {"parts": [
         {"name": "Cover", "pick": "not %s and x < -0.05 and (y < 0.1 or x < -0.3)" % WATCH_BODY, "type": "hinge", "axis": "Z", "normal": Vector((0, 1, 0))},
         {"name": "Chain", "pick": "not %s and x >= -0.05 and (x > 0.2 or z > 0.15)" % WATCH_BODY, "type": "chain"},
+    ]},
+    # Meshy gave the spyglass two caps hanging off the tube; one goes, the other is a real cap that fits over the objective lens
+    # The left cap is a cup lying open side up at (-0.2, -0.26); its little chain hangs from it and goes with it onto the lens.
+    "spyglass": {"delete": "x > 0.115 and -0.44 < y < -0.12", "parts": [
+        {"name": "Cap", "pick": SPY_CAP, "opening": Vector((0, 0, 1)), "type": "place", "lug": SPY_LUG},
+        {"name": "CapChain", "pick": "x < -0.135 and y < -0.15", "type": "chain", "parent": "Cap", "near": Vector((-0.2, -0.26, -0.1)), "anchor": SPY_LUG},
+    ]},
+    # the drawer starts shut (pushed flush into the box) and pulls out as modelled
+    "coffee_grinder": {"parts": [
+        {"name": "Drawer", "pick": "y < -0.26 and z < -0.12", "type": "slide", "start": 1.0},
+    ]},
+    # the lid lifts off and tips back
+    "kettle": {"parts": [
+        {"name": "Lid", "pick": "0.054 < z < 0.27 and abs(x - 0.08) < 0.2 and abs(y) < 0.27", "type": "lift"},
     ]},
 }
 
@@ -218,6 +234,102 @@ def plate(part, body_center, mesh_uv_obj):
     return len(ring)
 
 
+def pca(vs):
+    import numpy as np
+    a = np.array([[v.x, v.y, v.z] for v in vs])
+    c = a.mean(axis=0)
+    _, _, vt = np.linalg.svd(a - c, full_matrices=False)
+    return Vector(c), [Vector(r) for r in vt]
+
+
+def move(kind, ps, part, body):
+    """A part that moves without a hinge, as the game's hinge blend (turn about `axis` by `closed`, shift by `offset`, scale by `scale`,
+    about the part's own centre), from its modelled place (0) to its other place (1)."""
+    vs = verts(part)
+    bv = verts(body)
+    lo = Vector((min(v.x for v in vs), min(v.y for v in vs), min(v.z for v in vs)))
+    hi = Vector((max(v.x for v in vs), max(v.y for v in vs), max(v.z for v in vs)))
+    pivot = (lo + hi) / 2
+    axis, ang, offset, scale, arc = Vector((1, 0, 0)), 0.0, Vector(), 1.0, 0.0
+    if ps["type"] == "place":
+        # the cap: its opening, the way its faces don't point (a cup's faces point out of its closed end and sides)
+        mw = part.matrix_world
+        disc = []
+        for p in part.data.polygons:
+            x, y, z = mw @ p.center
+            if eval(ps.get("measure", "True")):
+                disc += [mw @ part.data.vertices[i].co for i in p.vertices]
+        cen, ax = pca(disc)
+        opening = ps["opening"]                                 ## the cap's axis, pointing out of its open side
+        vs = disc
+        rad = sorted(((v - cen) - opening * (v - cen).dot(opening)).length for v in vs)
+        cap_r = rad[int(len(rad) * 0.9)]                       ## (past the rim: the loop its chain hangs from)
+        depth = max(v.dot(opening) for v in vs) - min(v.dot(opening) for v in vs)
+        # the objective: the tube's end, lowest y; its ring's centre and outer radius
+        ymin = min(v.y for v in bv)
+        ring = [v for v in bv if v.y < ymin + 0.035]
+        rc = Vector((sum(v.x for v in ring) / len(ring), 0, sum(v.z for v in ring) / len(ring)))
+        rr = sorted(((v.x - rc.x) ** 2 + (v.z - rc.z) ** 2) ** 0.5 for v in ring)
+        lens_r = rr[int(len(rr) * 0.97)]
+        scale = (lens_r + 0.012) / cap_r                        ## its rim just over the lens ring
+        # Meshy made it a cup with a one-sided floor (seen only from inside): give the floor an outside, so the cap on the lens is solid
+        bm = bmesh.new()
+        bm.from_mesh(part.data)
+        inv = part.matrix_world.inverted().to_3x3()
+        def in_disc(f):
+            x, y, z = mw @ f.calc_center_median()
+            return eval(ps.get("measure", "True"))
+        floor = [f for f in bm.faces if in_disc(f) and (mw.to_3x3() @ f.normal).normalized().dot(opening) > 0.6]
+        res = bmesh.ops.duplicate(bm, geom=floor)
+        new = [g for g in res["geom"] if isinstance(g, bmesh.types.BMFace)]
+        bmesh.ops.reverse_faces(bm, faces=new)
+        moved = {v for f in new for v in f.verts}
+        for v in moved:
+            v.co -= inv @ (opening * 0.003)
+        bm.to_mesh(part.data)
+        bm.free()
+        print(kind, "cap floor given an outside:", len(new), "faces")
+        q = opening.rotation_difference(Vector((0, 1, 0)))        ## the open side toward the tube
+        if ps.get("lug"):
+            # turned about the tube's axis so the point its chain hangs from faces the chain's lug: the chain runs straight back to it
+            lug = ps["lug"]
+            att = min(vs, key=lambda v: (v - lug).length)
+            a = q.to_matrix() @ (att - cen)
+            want = math.atan2(lug.z - rc.z, lug.x - rc.x)
+            have = math.atan2(a.z, a.x)
+            from mathutils import Quaternion
+            q = Quaternion(Vector((0, 1, 0)), -(want - have)) @ q
+        axis, ang = q.axis, q.angle
+        # where its centre goes: its closed end just past the lens, the rim reaching back over the tube
+        R = q.to_matrix()
+        fin0 = [R @ ((v - cen) * scale) + cen for v in disc]
+        mid = Vector(((min(v.x for v in fin0) + max(v.x for v in fin0)) / 2, min(v.y for v in fin0), (min(v.z for v in fin0) + max(v.z for v in fin0)) / 2))
+        pivot = cen
+        offset = Vector((rc.x, ymin - 0.012, rc.z)) - mid
+        arc = 0.06
+        # check: where the cap ends up (its floor's outside against the lens's tip)
+        R = q.to_matrix()
+        fin = [R @ ((v - cen) * scale) + cen + offset for v in disc]
+        print(kind, "cap on lens: y %.4f..%.4f  (lens tip %.4f)  x %.4f..%.4f z %.4f..%.4f" % (min(v.y for v in fin), max(v.y for v in fin), ymin,
+              min(v.x for v in fin), max(v.x for v in fin), min(v.z for v in fin), max(v.z for v in fin)))
+        print(kind, "cap r %.4f depth %.4f lens r %.4f scale %.3f opening %s" % (cap_r, depth, lens_r, scale, tuple(round(c, 3) for c in opening)))
+    elif ps["type"] == "slide":
+        # the drawer's front pushed back level with the box's front around it
+        # its front board (not the knob) pushed back level with the front of the frame around the drawer's opening
+        frame = [v for v in bv if lo.z - 0.03 < v.z < hi.z + 0.03 and lo.x - 0.03 < v.x < hi.x + 0.03]
+        fy = min(v.y for v in frame)
+        plate = sorted(v.y for v in vs)[int(len(vs) * 0.15)]
+        offset = Vector((0, fy - plate, 0))
+        print(kind, "drawer: frame front %.4f, board %.4f, knob %.4f, push %.4f" % (fy, plate, lo.y, fy - plate))
+    else:                                                       ## lift: up and tipped back
+        offset = Vector((0, 0, 0.09))
+        axis, ang = Vector((1, 0, 0)), -0.35
+        arc = 0.0
+    m = {"type": "hinge", "pivot": to_godot(pivot), "axis": to_godot(axis.normalized()), "closed": round(ang, 4), "offset": to_godot(offset),
+         "scale": round(scale, 4), "arc": arc, "start": ps.get("start", 0.0)}
+    return pivot, m
+
+
 def run(kind):
     spec = SPEC[kind]
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -231,6 +343,10 @@ def run(kind):
     print(kind, "duplicate faces removed:", dedupe(body))
     if spec.get("unstack", False):                               ## only where flicker was seen: elsewhere the layers are the model's shape
         print(kind, "stacked faces removed:", unstack(body, spec.get("keep", "bright"), spec.get("unstack_where", "True"), spec.get("unstack_gap", 0.004), spec.get("unstack_sink", 0.0)))
+    if spec.get("delete"):                                       ## a duplicate Meshy made: cut out and thrown away
+        junk = separate(body, spec["delete"])
+        print(kind, "deleted faces:", len(junk.data.polygons))
+        bpy.data.objects.remove(junk, do_unlink=True)
     out = {}
     parts = []
     for ps in spec["parts"]:
@@ -287,12 +403,23 @@ def run(kind):
                 target = Vector((fc.x, fy - (max(v.y for v in shut) - sc.y), fc.z))
             offset = (target - sc) if ps.get("seat", True) else Vector()     ## (the compass's swing seats it already: its "rim" is its hinge)
             out[ps["name"]] = {"type": "hinge", "pivot": to_godot(pivot), "axis": to_godot(axis), "closed": round(ang, 4), "offset": to_godot(offset)}
+        elif ps["type"] in ("place", "slide", "lift"):
+            pivot, mv = move(kind, ps, part, body)
+            out[ps["name"]] = mv
         else:                                                   ## a chain: hangs from its top link
-            hi = max(v.z for v in vs)
-            top = [v for v in vs if v.z > hi - 0.015]
+            if ps.get("near"):                                  ## hangs from the end nearest the part it belongs to
+                dn = min((v - ps["near"]).length for v in vs)
+                top = [v for v in vs if (v - ps["near"]).length < dn + 0.015]
+            else:
+                hi = max(v.z for v in vs)
+                top = [v for v in vs if v.z > hi - 0.015]
             pivot = sum(top, Vector()) / len(top)
             cen = sum(vs, Vector()) / len(vs)
             out[ps["name"]] = {"type": "chain", "pivot": to_godot(pivot), "hang": to_godot((cen - pivot).normalized())}
+            if ps.get("parent"):
+                out[ps["name"]]["parent"] = ps["parent"]
+            if ps.get("anchor"):                                 ## with its cap on the lens, it runs back to here on the tube
+                out[ps["name"]]["anchor"] = to_godot(ps["anchor"])
         # the part's origin on its pivot, so turning the node turns the part about the hinge
         bpy.context.scene.cursor.location = pivot
         bpy.ops.object.select_all(action="DESELECT")
@@ -307,5 +434,8 @@ def run(kind):
         json.dump(out, f, indent=1)
 
 
+import sys
+_only = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 for k in SPEC:
-    run(k)
+    if not _only or k in _only:
+        run(k)
