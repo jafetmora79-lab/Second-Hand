@@ -10,6 +10,10 @@ const WING_X := 1.0                        ## the counter's side wings (a U roun
 const WING_Z := 0.22
 const WING_LEN := 0.88
 const MAT := Vector3(0.0, 1.025, -0.57)    ## the velvet mat, on the U counter's front section (z -0.72..-0.42)
+## The banker's lamp stands just right of the mat, its green shade turned to face it: its light falls across the mat, not the counter.
+const LAMP_AT := Vector3(0.42, COUNTER_TOP, -0.50)
+const LAMP_YAW := -1.25                    ## the lamp faces +Z at 0; this turns it to look along -X, a little toward you
+const LAMP_SHADE := Vector3(0.35, COUNTER_TOP + 0.23, -0.50)     ## under the shade: where its light comes from
 const CUSTOMER_SPOT := Vector3(0.0, 0.0, -1.45)
 const DOOR := Vector3(-2.2, 0.0, -3.9)
 const DOOR_W := 0.92                       ## the opening in the kit's doorway wall, at 3 m wide and 2.95 m tall
@@ -100,11 +104,13 @@ static func build(root: Node3D) -> Dictionary:
 	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.72), 0.36, -PI * 0.5)       ## plate on the back wall beside the window
 	for side: float in [-1.0, 1.0]:                                                     ## one on each side wall, by the counter
 		_prop(shop, "shop/HK_lantern", Vector3(side * 2.7, 1.85, -0.55), 0.4, 0.0 if side < 0.0 else PI)
-	var lamp := SpotLight3D.new()
-	lamp.position = Vector3(0.3, COUNTER_TOP + 0.5, MAT.z + 0.05)
-	lamp.rotation = Vector3(-PI * 0.5, 0, 0.45)
-	lamp.spot_angle = 38.0
-	lamp.spot_range = 2.0
+	var lamp := SpotLight3D.new()                       ## the banker's lamp's light: out from under its shade, onto the middle of the mat
+	lamp.position = LAMP_SHADE
+	lamp.look_at_from_position(LAMP_SHADE, Vector3(-0.07, COUNTER_TOP, MAT.z), Vector3.UP)
+	lamp.spot_angle = 50.0
+	lamp.spot_angle_attenuation = 0.5
+	lamp.spot_attenuation = 0.35                       ## a gentle falloff: the mat's far edge nearly as bright as its near one, no hot spot by the lamp
+	lamp.spot_range = 1.4
 	lamp.light_energy = 2.5
 	lamp.light_color = Color(1.0, 0.94, 0.83)
 	lamp.shadow_enabled = true
@@ -220,7 +226,7 @@ static func _furnish(shop: Node3D) -> Dictionary:
 	# the ledger, open on the counter left of the mat
 	_prop(shop, "shop/ledger", Vector3(-0.6, COUNTER_TOP, -0.57), 0.0, 0.12, 1, Vector3(0.24, 0.0, 0.0))
 	# the banker's lamp right of the mat: its pull chain is a separate part (tools/split_props.py) so it can be pulled
-	var lamp := _prop(shop, "shop/bankers_lamp_parts", Vector3(0.62, COUNTER_TOP, -0.55), 0.3, -0.45)
+	var lamp := _prop(shop, "shop/bankers_lamp_parts", LAMP_AT, 0.3, LAMP_YAW)
 	var chain: Node3D = null
 	if lamp != null:
 		chain = lamp.find_child("Chain", true, false) as Node3D
@@ -228,7 +234,7 @@ static func _furnish(shop: Node3D) -> Dictionary:
 	bulb.light_color = Color(1.0, 0.9, 0.7)
 	bulb.light_energy = 0.9
 	bulb.omni_range = 1.1
-	bulb.position = Vector3(0.58, COUNTER_TOP + 0.19, -0.52)
+	bulb.position = LAMP_SHADE + Vector3(0, -0.03, 0)
 	shop.add_child(bulb)
 	# the wall clock on the back wall, between the door and the stove; hands drawn on its blank dial
 	var hands: Array = []
