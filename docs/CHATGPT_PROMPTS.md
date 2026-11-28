@@ -116,3 +116,21 @@ Make 5 separate square images, one at a time, all in exactly the same style. Eac
 5. A pawn-shop style display counter: a long counter with a warm honey-wood base, a glass-topped display case with glass front panels running its full length, and tall clear glass security screens standing on top of it in metal frames, with a small open gap at counter height in the middle to pass things through. Thin brass trim on the edges. The display case inside is EMPTY and all the glass is clear.
 ```
 The counter is asked for empty on purpose: Meshy can't make real see-through glass, so I'll give it real glass panes in the game and put the shop's actual Meshy objects (the ones you're selling) inside it.
+
+# Batch 5: the shop's finishing props (two prompts)
+
+**Prompt A: five props**
+```
+Make 5 separate square images, one at a time, all in exactly the same style. Each image: a single object as a standalone 3D game asset, isolated on a plain white background, three-quarter view from slightly above, the whole object in frame, no people, no scenery, no text, no logos. Style for all: semi-realistic low-poly with chunky shapes and a subtle pixel-art texture, warm muted palette, old log-cabin antique shop in a snowy mountain town of the 1950s.
+1. A brass banker's desk lamp: a green glass shade, a curved brass stem, a heavy round brass base, a small pull chain.
+2. An open ledger book lying flat: worn brown leather covers, thick cream pages with faint ruled lines and no legible writing, a red ribbon bookmark.
+3. A small 1950s security monitor: a walnut-veneer wooden cabinet with rounded corners, a slightly curved dark grey glass screen facing straight forward, two brass knobs below the screen, no brand names.
+4. A wooden pendulum wall clock: a tall dark wood case with a carved top, a plain cream dial with black numerals and NO hands, a glass door in front of a brass pendulum, facing straight forward.
+5. A low display bench: dark worn wood, four simple square legs, a long flat top with rounded edges, about knee height, empty.
+```
+
+**Prompt B: the rug (a texture, not a 3D model)**
+```
+Make 1 square image: a woven rug seen straight down from directly above, filling the whole frame edge to edge with no background showing. A burgundy field with a cream and dark brown geometric border, a simple diamond pattern in the middle, slightly worn and faded at the edges. Subtle pixel-art texture, warm muted palette, 1950s mountain cabin. Flat, evenly lit, no shadows, no perspective, no furniture, no text.
+```
+Prompt A's five go through Meshy. The clock is asked for without hands, and the monitor with its screen facing forward, so the game can give the clock moving hands and put the live porch camera on the monitor's screen. The rug in Prompt B is used directly as a floor texture: no Meshy credits needed.
