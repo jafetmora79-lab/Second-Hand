@@ -6,7 +6,7 @@ render_mode unshaded, cull_back;
 
 uniform sampler2D feed : source_color, filter_linear;
 uniform float on = 1.0;          // 0 when nobody is at the door: a dark, faintly glowing screen
-uniform float shape = 4.0;       // the tube's outline: a superellipse (2 = oval, higher = squarer), big round corners, bowed sides
+uniform float shape = 5.0;       // the tube's outline: a superellipse (2 = oval, higher = squarer), big round corners, bowed sides
 uniform float bulge = 0.08;      // how much the picture bows out, like a curved tube
 
 void fragment() {
