@@ -17,11 +17,11 @@ ITEMS = os.path.join(ROOT, "assets", "items")
 WATCH_BODY = "(y > 0.1 and ((((x+0.05)**2+(z+0.05)**2)**0.5 < 0.335 and x < 0.265) or (abs(x+0.03) < 0.15 and z > 0.2)))"
 # per kind: parts in Blender coordinates (Z up). A hinge closes about `axis` until the part lies flat across `normal` at `cap`.
 SPEC = {
-    "music_box": {"keep": "dark", "unstack_where": "abs(x) > 0.41 or y < -0.41 or z < -0.38 or z > 0.0 or y > 0.38", "parts": [   ## the inlaid outer panels only                     ## its inlays are the darker of the stacked layers
+    "music_box": {"unstack": True, "keep": "dark", "unstack_where": "abs(x) > 0.41 or y < -0.41 or z < -0.38 or z > 0.0 or y > 0.38", "parts": [   ## the inlaid outer panels only; its inlays are the darker layer
         {"name": "Lid", "pick": "z > -0.02 and y > 0.15", "type": "hinge", "axis": "X", "normal": Vector((0, 0, 1))},
     ]},
     "compass": {"parts": [
-        {"name": "Lid", "pick": "y > 0.3 and z > -0.2", "type": "hinge", "axis": "X", "normal": Vector((0, 0, 1)), "plate": True},
+        {"name": "Lid", "pick": "y > 0.3 and z > -0.2", "type": "hinge", "axis": "X", "normal": Vector((0, 0, 1)), "plate": True, "seat": False},
     ]},
     "pocket_watch": {"parts": [
         {"name": "Cover", "pick": "not %s and x < -0.05 and (y < 0.1 or x < -0.3)" % WATCH_BODY, "type": "hinge", "axis": "Z", "normal": Vector((0, 1, 0))},
@@ -50,7 +50,7 @@ def dedupe(obj):
     return len(dup)
 
 
-def unstack(obj, keep="bright", where="True"):
+def unstack(obj, keep="bright", where="True", gap=0.004):
     """Faces lying on top of other faces (Meshy's inlays and panels: the same plane within a hair, one inside the other) flicker
     against each other in the game. Of each such pair, delete the darker one (the plain panel behind the inlay)."""
     from mathutils import kdtree
@@ -92,7 +92,7 @@ def unstack(obj, keep="bright", where="True"):
             if j == p.index or j in gone:
                 continue
             q = polys[j]
-            if q.normal.dot(p.normal) < 0.98 or abs((q.center - p.center).dot(p.normal)) > 0.004:      ## facing the same way: back-to-back faces never flicker
+            if q.normal.dot(p.normal) < 0.98 or abs((q.center - p.center).dot(p.normal)) > gap:      ## facing the same way: back-to-back faces never flicker
                 continue
             if intersect_point_tri(q.center - p.normal * (q.center - p.center).dot(p.normal), a, b, c) is None:
                 continue                                         ## side by side in one plane, not on top of each other
@@ -219,7 +219,8 @@ def run(kind):
     bpy.context.view_layer.objects.active = body
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     print(kind, "duplicate faces removed:", dedupe(body))
-    print(kind, "stacked faces removed:", unstack(body, spec.get("keep", "bright"), spec.get("unstack_where", "True")))
+    if spec.get("unstack", False):                               ## only where flicker was seen: elsewhere the layers are the model's shape
+        print(kind, "stacked faces removed:", unstack(body, spec.get("keep", "bright"), spec.get("unstack_where", "True"), spec.get("unstack_gap", 0.004)))
     out = {}
     parts = []
     for ps in spec["parts"]:
@@ -254,7 +255,28 @@ def run(kind):
             ang = closing_angle(part, pivot, axis, ps["normal"], cap)
             if ps.get("plate"):
                 print(kind, "lid plate sides:", plate(part, bcen, body))
-            out[ps["name"]] = {"type": "hinge", "pivot": to_godot(pivot), "axis": to_godot(axis), "closed": round(ang, 4)}
+            # where the part must end up shut: a top lid centred on the body's rim and resting on it; the watch's cover centred on the
+            # case's front. The swing alone gets close; this small shift makes it seat exactly (the game blends it in as it closes).
+            r = Matrix.Rotation(ang, 3, axis)
+            shut = [r @ (v - pivot) + pivot for v in vs]
+            sc = sum(shut, Vector()) / len(shut)
+            n = ps["normal"]
+            if ps["axis"] == "X":
+                zs = sorted(v.z for v in bv)
+                top = zs[int(len(zs) * 0.97)]                          ## the rim: where the walls end, not a stray hinge or key above it
+                rim = [v for v in bv if abs(v.z - top) < 0.02]
+                xs = sorted(v.x for v in rim)
+                ys = sorted(v.y for v in rim)
+                rc = Vector(((xs[int(len(xs) * 0.05)] + xs[int(len(xs) * 0.95)]) / 2, (ys[int(len(ys) * 0.05)] + ys[int(len(ys) * 0.95)]) / 2, 0))
+                lid_lo = sorted(v.z for v in shut)[int(len(shut) * 0.03)]
+                target = Vector((rc.x, rc.y, sc.z + (top - lid_lo) - 0.004))
+            else:
+                face = [v for v in bv if ((v.x + 0.05) ** 2 + (v.z + 0.05) ** 2) ** 0.5 < 0.3]
+                fy = min(v.y for v in face)
+                fc = sum((v for v in face if v.y < fy + 0.03), Vector()) / max(1, len([v for v in face if v.y < fy + 0.03]))
+                target = Vector((fc.x, fy - (max(v.y for v in shut) - sc.y), fc.z))
+            offset = (target - sc) if ps.get("seat", True) else Vector()     ## (the compass's swing seats it already: its "rim" is its hinge)
+            out[ps["name"]] = {"type": "hinge", "pivot": to_godot(pivot), "axis": to_godot(axis), "closed": round(ang, 4), "offset": to_godot(offset)}
         else:                                                   ## a chain: hangs from its top link
             hi = max(v.z for v in vs)
             top = [v for v in vs if v.z > hi - 0.015]

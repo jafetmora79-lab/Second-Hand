@@ -30,6 +30,9 @@ func setup(item_root: Node3D, model: Node3D, data: Dictionary) -> void:
 			var ax: Array = d["axis"]
 			p["axis"] = Vector3(ax[0], ax[1], ax[2]).normalized()
 			p["closed"] = float(d["closed"])
+			var off: Array = d.get("offset", [0.0, 0.0, 0.0])
+			p["offset"] = Vector3(off[0], off[1], off[2])       ## the small shift that seats it exactly once shut
+			p["rest_pos"] = node.position
 			p["t"] = 0.0
 			p["target"] = 0.0
 		else:
@@ -71,6 +74,7 @@ func _process(delta: float) -> void:
 			p["t"] = t
 			var eased := t * t * (3.0 - 2.0 * t)
 			node.transform.basis = Basis(p["axis"], float(p["closed"]) * eased) * (p["rest"] as Basis)
+			node.position = (p["rest_pos"] as Vector3) + (p["offset"] as Vector3) * eased
 		else:
 			_swing(p, delta)
 		_follow(p)

@@ -340,8 +340,7 @@ func stop_restore() -> void:
 	var n: Node3D = st["node"]
 	if n != null and is_instance_valid(n):
 		var tw := create_tween()
-		tw.tween_property(n, "global_position", (st["slot"] as Vector3) + Vector3(0, 0.12, 0), 0.6).set_trans(Tween.TRANS_SINE)
-		tw.parallel().tween_property(n, "scale", Vector3.ONE * 0.9, 0.6)
+		tw.tween_property(n, "global_transform", _seat(n, st["slot"]), 0.6).set_trans(Tween.TRANS_SINE)
 
 ## Scrubbing: each stroke over the piece takes some grime off.
 func _scrub(motion: Vector2, at: Vector2) -> void:
@@ -739,16 +738,16 @@ func _build_monitor() -> void:
 	monitor_screen = mon.position + mon.basis * screen.position
 
 ## The shop's own collection in the glass counter, not for sale: one of each kind of object, the real thing.
+var case_decor := {}                       ## the shop's own pieces in the glass case, by spot (a pricey purchase takes their place)
 func _decorate() -> void:
 	var kinds := Items.KINDS.keys()
 	var spots: Array = shop["decor"]
 	for i in spots.size():
 		var n := Models.build({"kind": kinds[i % kinds.size()], "clues": []})
 		var spot: Vector3 = spots[i]
-		n.position = spot + Vector3(0, 0.1, 0)
-		n.scale = Vector3.ONE * 0.75
-		n.rotation.y = fx_rng.randf_range(-0.5, 0.5) + PI
 		add_child(n)
+		n.global_transform = _seat(n, spot)
+		case_decor[spot] = n
 
 func _arrived() -> void:
 	var info: Dictionary = visitor["info"]
@@ -1057,13 +1056,12 @@ func load_game() -> bool:
 	rng.state = int(d["rng_state"])
 	_shown_stock_reset()
 	for e: Dictionary in d["stock"]:
-		var slot := _free_slot()
+		var slot := _free_slot(int(e["paid"]))
 		if slot == Vector3.INF:
 			break
 		var node := Models.build(e["item"])
 		add_child(node)
-		node.global_position = slot + Vector3(0, 0.12, 0)
-		node.scale = Vector3.ONE * 0.9
+		node.global_transform = _seat(node, slot)
 		var ri := int(e.get("record", -1))
 		stock.append({"item": e["item"], "paid": int(e["paid"]), "node": node, "slot": slot, "record": purchases[ri] if ri >= 0 and ri < purchases.size() else {}})
 		_grime(node, float((e["item"] as Dictionary).get("grime", 0.0)))
@@ -1172,9 +1170,9 @@ func _view(delta: float) -> void:
 	var to_mon := (monitor_screen - SHOP_EYE).normalized()
 	if not talk_focus and monitor_screen != Vector3.ZERO and (-want.z).angle_to(to_mon) < MONITOR_SNAP:
 		# looking at the monitor: lean in and zoom until its screen fills the middle of the view
-		eye = SHOP_EYE + to_mon * maxf(0.0, SHOP_EYE.distance_to(monitor_screen) - 0.62)   ## close enough that the screen fills the view
+		eye = SHOP_EYE + to_mon * maxf(0.0, SHOP_EYE.distance_to(monitor_screen) - 0.9)    ## near enough to read, the whole set in view
 		want = Basis.looking_at(monitor_screen - Vector3(0, 0.045, 0) - eye)    ## a little low, so the screen sits above the speech box
-		fov = 21.0
+		fov = 30.0
 		rate = TALK_EASE
 	elif (not talk_focus or state in ["idle", "walking"]) and (restoring or (-want.z).angle_to((BENCH_SPOT - SHOP_EYE).normalized()) < BENCH_SNAP):
 		# looking at the restoration bench: lean over it
@@ -1492,7 +1490,7 @@ func _buy(price: int) -> void:
 	if price > money:
 		ui.toast("You don't have $%d." % price)
 		return
-	if _free_slot() == Vector3.INF:
+	if _free_slot(price) == Vector3.INF:
 		ui.toast("Your shelves are full. Sell something first.")
 		return
 	var info: Dictionary = visitor["info"]
@@ -1512,7 +1510,7 @@ func _buy(price: int) -> void:
 	day_log["spent"] += price
 	ui.cash(-price)
 	# the object goes onto a shelf
-	var slot := _free_slot()
+	var slot := _free_slot(price)
 	var n := item_node
 	item_node = null
 	if slot != Vector3.INF and n != null:
@@ -1520,8 +1518,7 @@ func _buy(price: int) -> void:
 		n.get_parent().remove_child(n)
 		add_child(n)
 		n.global_transform = g
-		create_tween().tween_property(n, "global_position", slot + Vector3(0, 0.12, 0), 0.6).set_trans(Tween.TRANS_SINE)
-		create_tween().tween_property(n, "scale", Vector3.ONE * 0.9, 0.6)
+		create_tween().tween_property(n, "global_transform", _seat(n, slot), 0.6).set_trans(Tween.TRANS_SINE)
 	if not item.has("grime"):
 		item["grime"] = 1.0                                  ## straight out of an attic: it wants a clean
 	stock.append({"item": item, "paid": price, "node": n, "slot": slot, "record": bought})
@@ -1529,7 +1526,47 @@ func _buy(price: int) -> void:
 	pivot.scale = Vector3.ONE
 	_leave(info["accept"])
 
-func _free_slot() -> Vector3:
+const PRICEY := 150                        ## pay this much or more and the piece goes in the glass case, not on a shelf
+
+## Where a bought piece goes: a pricey one into the glass case (taking the place of one of the shop's own pieces there) while there's
+## room, everything else on the shelves.
+func _free_slot(price: int = 0) -> Vector3:
+	if price >= PRICEY:
+		for spot: Vector3 in shop["decor"]:
+			var taken := false
+			for st: Dictionary in stock:
+				if st["slot"] == spot:
+					taken = true
+			if not taken:
+				var d: Node3D = case_decor.get(spot)
+				if d != null and is_instance_valid(d):
+					d.queue_free()                            ## the shop's own piece makes way
+				case_decor.erase(spot)
+				return spot
+	return _free_shelf()
+
+## How a piece sits at `slot`: upright, facing into the room (from a side wall's shelves) or out to the customers (in the case),
+## its base resting on the surface, slightly smaller than in the hand.
+func _seat(n: Node3D, slot: Vector3) -> Transform3D:
+	var yaw := PI                                         ## in the case: facing the customers
+	if slot.x < -2.0:
+		yaw = PI * 0.5                                    ## left wall's shelves: facing into the room
+	elif slot.x > 2.0:
+		yaw = -PI * 0.5
+	var sc := 0.78 if slot in shop["decor"] else 0.9
+	var box := AABB()
+	var first := true
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		if (mi as MeshInstance3D).has_meta("clue"):
+			continue
+		var b := Models._rel(n, mi as Node3D) * (mi as MeshInstance3D).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	var basis := Basis(Vector3.UP, yaw) * Basis.from_scale(Vector3.ONE * sc)
+	var centre := basis * Vector3(box.get_center().x, box.position.y, box.get_center().z)
+	return Transform3D(basis, slot + Vector3(0, 0.004, 0) - centre)
+
+func _free_shelf() -> Vector3:
 	for s: Vector3 in shelf_slots:
 		var used := false
 		for st: Dictionary in stock:

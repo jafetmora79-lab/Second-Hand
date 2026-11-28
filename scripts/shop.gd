@@ -95,7 +95,7 @@ static func build(root: Node3D) -> Dictionary:
 	# the counter's two wings coming back toward you, a U round where you stand (Timberline's plain counter, the same height as the
 	# glass case): the security monitor on the left wing, the restoration bench on the right
 	## (the U counter's own arms are the wings now: see _glass_counter)
-	_box(shop, Vector3(0, COUNTER_TOP + 0.006, MAT.z), Vector3(0.62, 0.01, 0.28), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
+	_box(shop, Vector3(0, COUNTER_TOP + 0.006, MAT.z), Vector3(0.46, 0.01, 0.24), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
 	# the warm light on the mat, from your right so nothing stands between you and the customer; a wall lantern by the window
 	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.72), 0.36, -PI * 0.5)       ## plate on the back wall beside the window
 	for side: float in [-1.0, 1.0]:                                                     ## one on each side wall, by the counter
@@ -218,9 +218,9 @@ static func _furnish(shop: Node3D) -> Dictionary:
 	rug.position = Vector3(0, 0.008, -2.3)
 	shop.add_child(rug)
 	# the ledger, open on the counter left of the mat
-	_prop(shop, "shop/ledger", Vector3(-0.62, COUNTER_TOP, -0.57), 0.0, 0.3, 1, Vector3(0.32, 0.0, 0.0))
+	_prop(shop, "shop/ledger", Vector3(-0.6, COUNTER_TOP, -0.57), 0.0, 0.12, 1, Vector3(0.24, 0.0, 0.0))
 	# the banker's lamp right of the mat: its pull chain is a separate part (tools/split_props.py) so it can be pulled
-	var lamp := _prop(shop, "shop/bankers_lamp_parts", Vector3(0.74, COUNTER_TOP, -0.5), 0.32, -0.55)
+	var lamp := _prop(shop, "shop/bankers_lamp_parts", Vector3(0.62, COUNTER_TOP, -0.55), 0.3, -0.45)
 	var chain: Node3D = null
 	if lamp != null:
 		chain = lamp.find_child("Chain", true, false) as Node3D
@@ -228,7 +228,7 @@ static func _furnish(shop: Node3D) -> Dictionary:
 	bulb.light_color = Color(1.0, 0.9, 0.7)
 	bulb.light_energy = 0.9
 	bulb.omni_range = 1.1
-	bulb.position = Vector3(0.7, COUNTER_TOP + 0.2, -0.47)
+	bulb.position = Vector3(0.58, COUNTER_TOP + 0.19, -0.52)
 	shop.add_child(bulb)
 	# the wall clock on the back wall, between the door and the stove; hands drawn on its blank dial
 	var hands: Array = []
@@ -333,12 +333,15 @@ static func _u_counter(shop: Node3D) -> Array:
 			g.shader = sh
 			if src != null:
 				g.set_shader_parameter("tex", src.albedo_texture)
-			g.set_shader_parameter("top_y", Vector2(9.0, 9.0))               ## its top is solid wood
+			g.set_shader_parameter("top_y", Vector2(0.035, 0.085))            ## the front case's top is glass either side of the mat
+			g.set_shader_parameter("top_rect", Vector4(-0.47, -0.49, 0.47, -0.27))
+			g.set_shader_parameter("top_gap", 0.1)
+			g.set_shader_parameter("staff_doors", true)                     ## from your side: wood and sliding doors
 			g.set_shader_parameter("screen_base", 0.075)        ## just above its countertop (model space)
 			m.set_surface_override_material(i, g)
 	var spots: Array = []
-	for x: float in [-0.95, -0.65, -0.35, 0.35, 0.65, 0.95]:
-		spots.append(Vector3(x, 0.56, -0.62))
+	for x: float in [-0.85, -0.55, -0.25, 0.25, 0.55, 0.85]:     ## on the case's floor (measured at 0.49 m), under the glass top
+		spots.append(Vector3(x, 0.49, -0.57))
 	return spots
 
 ## A Timberline house-kit piece (assets/kit), stretched to `size` (x along it, y up, z through it), bottom at pos.y, centred on pos.
