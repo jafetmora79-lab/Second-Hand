@@ -2,13 +2,13 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bh4lgsrso83v"
+uid="uid://dxdd31leakolg"
 path="res://.godot/imported/decorator_Image_0.png-e1b451b2198fb0993ea551eb79cb3131.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "dfb0d8182885842e3638bdd9da2d330c"
+"md5": "52c691a2603aa0f182109d1c697bc3bd"
 }
 
 [deps]
@@ -33,5 +33,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=1024
 detect_3d/compress_to=1

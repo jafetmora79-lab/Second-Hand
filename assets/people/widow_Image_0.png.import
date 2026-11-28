@@ -2,13 +2,13 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://gphnie3sn0u6"
+uid="uid://bm5ismhwy0h2l"
 path="res://.godot/imported/widow_Image_0.png-5e708f402d11386ebc8c76ce173e1843.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "b418fd54aa38e9ad4bbfb7c51d2ccd03"
+"md5": "791ac14bff63cc1d339c2cd97aa68c6f"
 }
 
 [deps]
@@ -33,5 +33,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=1024
 detect_3d/compress_to=1

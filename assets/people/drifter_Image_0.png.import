@@ -2,13 +2,13 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bkcq5844pr4sy"
+uid="uid://dyv2vwpalfjsj"
 path="res://.godot/imported/drifter_Image_0.png-39ae712d6ebbf005607646385750c333.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "6cdbacad9a3265a9f8a32cc2fed63166"
+"md5": "841fa517af7b99a3e74fdf0520a5e1ae"
 }
 
 [deps]
@@ -33,5 +33,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=1024
 detect_3d/compress_to=1

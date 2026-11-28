@@ -2,13 +2,13 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ci8qt5xr38lba"
+uid="uid://ohh4wkjlbyxf"
 path="res://.godot/imported/kid_Image_0.png-c4edb29af27f0c0078e8b3b8be8490c8.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "67ad2ee1a327f2e22886b422b93b3005"
+"md5": "2e21cea542da0b954812aca040308965"
 }
 
 [deps]
@@ -33,5 +33,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=1024
 detect_3d/compress_to=1
