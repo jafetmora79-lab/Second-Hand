@@ -162,3 +162,28 @@ Make 5 separate square images, one at a time, all in exactly the same style. Eac
 Make 1 square image: a jeweller's appraisal mat seen straight down from directly above, filling the whole frame edge to edge with no background showing. A deep green baize felt surface, a stitched dark brown leather border all round, small brass studs at the four corners, slightly worn and faded in the middle where things are set down. Subtle pixel-art texture, warm muted palette. Flat, evenly lit, no shadows, no perspective, no objects on it, no text.
 ```
 Prompt A and B items go through Meshy (15 credits each with meshy-t2 + meshy-n1, as for the props); the music box in Prompt B replaces the old model, whose panels have overlapping layers that flicker. Prompt C is used directly as the mat's texture, no credits.
+
+# Batch 7: maker's marks for the new antiques (two prompts, one image each)
+
+Same layout as the first two mark atlases (docs/concepts/marks/atlas_1.webp): one row per antique, three tiles in a row: the genuine mark,
+a near-miss fake (a misspelling or a wrong detail you only catch up close), and a reproduction. Every mark fits 1956: no later dates.
+
+**Prompt 7A: marks for the spyglass, barometer, carriage clock, coffee grinder and kettle**
+```
+Make 1 wide image: a sheet of antique maker's marks on a plain light grey background, 5 rows of 3 tiles, every tile separate with space around it, each seen straight on, evenly lit, crisp readable lettering. Style for all: semi-realistic with a subtle pixel-art texture, warm muted palette, like the maker's plates and stamps on antiques in a 1950s antique shop. Only the text given below, nothing else written anywhere.
+Row 1, letters engraved into a curved brass band: "J. ASHCROFT · LONDON", then "J. ASHCROFT · LONDOM", then "MADE IN JAPAN".
+Row 2, a small engraved brass plate with two screws: "HOLM & CO. / BERGEN", then "HOLM & CO. / BERGIN", then a printed paper sticker "HOLM & CO." with a red border.
+Row 3, letters stamped into an oval on a brass clock back plate: "R & C / PARIS", then "R & G / PARIS", then "MADE IN / W. GERMANY".
+Row 4, raised letters cast into dark iron: "KRONBERG / No. 3", then "KRONBURG / No. 3", then a small paper price tag "$2.98".
+Row 5, letters stamped into a circle on copper: "H.L. / SOLID COPPER / 1910", then "H.L. / COPPER PLATED", then "COPPER-TONE".
+```
+
+**Prompt 7B: marks for the toy car, duck decoy, dog bank and telephone** (the new music box keeps the Lindqvist marks)
+```
+Make 1 wide image: a sheet of antique maker's marks on a plain light grey background, 4 rows of 3 tiles, every tile separate with space around it, each seen straight on, evenly lit, crisp readable lettering. Style for all: semi-realistic with a subtle pixel-art texture, warm muted palette, like the maker's plates and stamps on antiques in a 1950s antique shop. Only the text given below, nothing else written anywhere.
+Row 1, lettering printed on worn painted tin: "BRANDT / NÜRNBERG", then "BRANDT / NURNBURG", then "MADE IN / HONG KONG".
+Row 2, letters branded (burned) into pale wood: "W. PIKE / 1921", then "W. PYKE / 1921", then the same name stencilled in fresh black paint "W. PIKE".
+Row 3, raised letters cast into dark iron: "HALVORSEN IRON / PAT. 1888", then "HALVERSEN IRON / PAT. 1888", then "REPRODUCTION".
+Row 4, a small nickel plate with two screws: "NORTHERN BELL / No. 20", then "NORTHERN BEL / No. 20", then "No. 20 / REPLICA".
+```
+Save them as docs/concepts/marks/atlas_3.png and atlas_4.png; tools/extract_marks.py cuts them into the game's mark textures. No credits.
