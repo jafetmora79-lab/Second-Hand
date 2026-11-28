@@ -1722,7 +1722,10 @@ func sell_push() -> void:
 	patience -= 1
 	if rng.randf() < 0.55 and patience > 0:
 		ask = roundi(ask * 1.12 / 5.0) * 5
-		_say(info["name"], "\"All right. $%d, and not a cent more.\"" % ask)
+		if patience <= 1:                                ## their last word: push again and they walk, so it says so
+			_say(info["name"], "\"All right. $%d, and not a cent more.\"" % ask)
+		else:
+			_say(info["name"], "\"Hm. I could go to $%d.\"" % ask)
 		ui.show_buyer_actions(ask)
 	else:
 		_leave("Then I'll look elsewhere.")
