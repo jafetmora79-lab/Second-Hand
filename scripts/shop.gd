@@ -6,6 +6,9 @@ class_name Shop
 
 const COUNTER_Z := -0.62
 const COUNTER_TOP := 1.0                   ## the glass counter's top, 2.4 m wide
+const WING_X := 1.0                        ## the counter's side wings (a U round you): their middles, either side of you
+const WING_Z := 0.22
+const WING_LEN := 0.88
 const MAT := Vector3(0.0, 1.025, -0.5)     ## the velvet mat, behind the security screens on your side
 const CUSTOMER_SPOT := Vector3(0.0, 0.0, -1.45)
 const DOOR := Vector3(-2.2, 0.0, -3.9)
@@ -89,6 +92,10 @@ static func build(root: Node3D) -> Dictionary:
 			_box(shop, p + Vector3(0, 1.425, 0), Vector3(0.3, 2.95, 0.3), dark)
 	# the counter: a pawn-shop glass case with security screens (Meshy), the shop's own collection inside, the velvet mat on top
 	var case_spots := _glass_counter(shop)
+	# the counter's two wings coming back toward you, a U round where you stand (Timberline's plain counter, the same height as the
+	# glass case): the security monitor on the left wing, the restoration bench on the right
+	for side: float in [-1.0, 1.0]:
+		_kit(shop, "HK_counter", Vector3(side * WING_X, 0, WING_Z), side * PI * 0.5, Vector3(WING_LEN, COUNTER_TOP, 0.6))
 	_box(shop, Vector3(0, COUNTER_TOP + 0.006, MAT.z), Vector3(0.62, 0.01, 0.42), _mat(Color(0.32, 0.08, 0.1), 0.95))       ## the velvet mat
 	# the warm light on the mat, from your right so nothing stands between you and the customer; a wall lantern by the window
 	_prop(shop, "shop/HK_lantern", Vector3(0.05, 1.75, -3.72), 0.36, -PI * 0.5)       ## plate on the back wall beside the window

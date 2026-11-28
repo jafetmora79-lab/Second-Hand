@@ -591,6 +591,25 @@ func show_seller_actions() -> void:
 		_action("Say something...", func() -> void: show_talk_choices())
 	_action("Not interested", func() -> void: game.decline(), "stop")
 
+## The restoration bench: the pieces on your shelves that want cleaning.
+func show_bench_choices(dirty: Array) -> void:
+	hide_actions()
+	if dirty.is_empty():
+		_action("Nothing needs cleaning", func() -> void: pass, "paper")
+		return
+	for st: Dictionary in dirty.slice(0, 5):
+		var it: Dictionary = st["item"]
+		var left := int(round(float(it.get("grime", 1.0)) * 100.0))
+		_action("Clean the %s%s" % [String(it["name"]).to_lower(), "" if left >= 100 else " (%d%% left)" % left], func() -> void:
+			game.start_restore(st), "wood")
+
+## While a piece is on the bench.
+func show_restore_actions() -> void:
+	hide_actions()
+	_action("Put it back", func() -> void: game.stop_restore(), "stop")
+
+var bench_progress := -1.0                 ## 0..1 while a piece is being cleaned, -1 otherwise
+
 ## The three things you can say to a seller (once a visit).
 func show_talk_choices() -> void:
 	hide_actions()
@@ -936,6 +955,14 @@ func _draw() -> void:
 			draw_arc(loupe_at, r - 5, -PI * 0.5, -PI * 0.5 + TAU * clampf(loupe_progress, 0.0, 1.0), 48, UiStyle.AMBER, 4.0, true)
 		if loupe_hint != "":
 			draw_string(font, loupe_at + Vector2(-40, r + 22), loupe_hint, HORIZONTAL_ALIGNMENT_CENTER, 80, UiStyle.px(13), UiStyle.AMBER)
+	# cleaning progress, a slip at the top
+	if bench_progress >= 0.0:
+		var br := Rect2(Vector2(size.x * 0.5 - 170, 74), Vector2(340, 46))
+		draw_style_box(UiStyle.parchment_box(0.0, "parch_strip"), br)
+		draw_string(font, br.position + Vector2(16, 28), "Clean", HORIZONTAL_ALIGNMENT_LEFT, -1, UiStyle.px(13), UiStyle.INK)
+		var bar := Rect2(br.position + Vector2(76, 17), Vector2(244, 12))
+		draw_rect(bar, Color(UiStyle.INK, 0.25))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(bench_progress, 0.0, 1.0), bar.size.y)), UiStyle.GREEN)
 	# the speaker's tag, above the portrait
 	if _tag_text != "" and _speech.visible and not _hint.visible:      ## (the controls strip has that spot while you inspect)
 		var tfs := UiStyle.px(13)
@@ -957,7 +984,7 @@ func _draw() -> void:
 			t_right = _inspect.position.x - 14.0
 		elif _haggle.visible:
 			t_right = _haggle.position.x - 14.0
-		var t_top := 74.0
+		var t_top := 74.0 if bench_progress < 0.0 else 130.0     ## under the cleaning slip while there is one
 		if t_right - t_left < 420.0 and _tip.visible:            ## too narrow up there: the free space under the tip card instead
 			t_left = _tip.position.x
 			t_right = _tip.position.x + _tip.size.x

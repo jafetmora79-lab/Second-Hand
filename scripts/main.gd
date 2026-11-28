@@ -255,6 +255,129 @@ func _turn(f: Node3D, yaw: float) -> void:
 		if is_instance_valid(f):
 			f.rotation = Vector3(0, lerp_angle(y0, yaw, t), 0), 0.0, 1.0, TURN_TIME).set_trans(Tween.TRANS_SINE)
 
+# ---- the restoration bench: something to do between customers ---------------------------------------------------------------------
+## On your right behind the counter. Look at it while nobody needs you and you can bring a piece down off the shelves and scrub the
+## grime off it (hold the mouse button and rub back and forth over it). A genuine piece, cleaned, is worth more (RESTORE_GAIN); a copy,
+## cleaned, gives itself away: its tell shows through. If someone rings, the piece goes back on its shelf, keeping its progress.
+const BENCH := Vector3(1.0, 0.0, 0.22)       ## the counter's right wing, beside you
+const BENCH_SPOT := Vector3(0.98, 1.17, 0.24)  ## where a piece sits on the bench to be cleaned
+const BENCH_SNAP := 0.3                    ## look within this angle (radians) of the bench and the view leans over it
+const RESTORE_GAIN := 1.12                 ## a cleaned genuine piece's value
+const SCRUB_RATE := 0.0011                 ## grime taken off per pixel of scrubbing
+var restoring := false
+var restore_st: Dictionary = {}            ## the shelf entry on the bench
+var _scrubbing := false
+var _bench_shown := false                  ## the bench's choices are on screen
+
+## Grime on a piece: a dark, blotchy film over all of it, `amount` 0 (clean) .. 1 (fresh from the attic).
+var _grime_tex: NoiseTexture2D
+func _grime(node: Node3D, amount: float) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	var mat: StandardMaterial3D = node.get_meta("grime_mat") if node.has_meta("grime_mat") else null
+	if mat == null:
+		if _grime_tex == null:
+			_grime_tex = NoiseTexture2D.new()
+			_grime_tex.width = 128
+			_grime_tex.height = 128
+			_grime_tex.seamless = true
+			var n := FastNoiseLite.new()
+			n.frequency = 0.06
+			_grime_tex.noise = n
+		mat = StandardMaterial3D.new()
+		mat.albedo_texture = _grime_tex
+		mat.uv1_triplanar = true
+		mat.uv1_scale = Vector3.ONE * 18.0
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.roughness = 1.0
+		node.set_meta("grime_mat", mat)
+		for mi in node.find_children("*", "MeshInstance3D", true, false):
+			if not (mi as MeshInstance3D).has_meta("clue"):
+				(mi as MeshInstance3D).material_overlay = mat
+	mat.albedo_color = Color(0.22, 0.16, 0.1, 0.62 * clampf(amount, 0.0, 1.0))
+
+## The bench's choices, while you look at it and nobody needs you.
+func _bench_offer() -> void:
+	var looking := (not talk_focus or state in ["idle", "walking"]) and (-cam.global_transform.basis.z).angle_to((BENCH_SPOT - cam.global_position).normalized()) < 0.35
+	var free := state in ["idle", "walking"] and not restoring
+	if looking and free and not _bench_shown:
+		_bench_shown = true
+		var dirty: Array = []
+		for st: Dictionary in stock:
+			if float(st["item"].get("grime", 0.0)) > 0.0:
+				dirty.append(st)
+		ui.show_bench_choices(dirty)
+	elif _bench_shown and (not looking or not free):
+		_bench_shown = false
+		if not restoring:
+			ui.hide_actions()
+
+## Brings a piece from its shelf to the bench.
+func start_restore(st: Dictionary) -> void:
+	if restoring or not st in stock:
+		return
+	restoring = true
+	restore_st = st
+	ui.hide_actions()
+	var n: Node3D = st["node"]
+	var tw := create_tween()
+	tw.tween_property(n, "global_position", BENCH_SPOT, 0.6).set_trans(Tween.TRANS_SINE)
+	tw.parallel().tween_property(n, "scale", Vector3.ONE * 1.5, 0.6)
+	ui.show_restore_actions()
+	ui.toast("Hold the mouse button and scrub the grime off the %s." % String(st["item"]["name"]).to_lower())
+
+## Puts the piece back on its shelf (progress kept).
+func stop_restore() -> void:
+	if not restoring:
+		return
+	restoring = false
+	_scrubbing = false
+	ui.bench_progress = -1.0
+	ui.hide_actions()
+	_bench_shown = false
+	var st := restore_st
+	restore_st = {}
+	var n: Node3D = st["node"]
+	if n != null and is_instance_valid(n):
+		var tw := create_tween()
+		tw.tween_property(n, "global_position", (st["slot"] as Vector3) + Vector3(0, 0.12, 0), 0.6).set_trans(Tween.TRANS_SINE)
+		tw.parallel().tween_property(n, "scale", Vector3.ONE * 0.9, 0.6)
+
+## Scrubbing: each stroke over the piece takes some grime off.
+func _scrub(motion: Vector2, at: Vector2) -> void:
+	var n: Node3D = restore_st["node"]
+	if cam.is_position_behind(n.global_position) or cam.unproject_position(n.global_position).distance_to(at) > 220.0:
+		return
+	var it: Dictionary = restore_st["item"]
+	var g := maxf(0.0, float(it.get("grime", 1.0)) - motion.length() * SCRUB_RATE)
+	it["grime"] = g
+	_grime(n, g)
+	if g <= 0.0:
+		_restored(restore_st)
+
+## Clean. A genuine piece is worth more; a copy shows what it is.
+func _restored(st: Dictionary) -> void:
+	var it: Dictionary = st["item"]
+	var rec: Dictionary = st.get("record", {})
+	if it["fake"]:
+		var tell := ""
+		for c: Dictionary in it["clues"]:
+			if c.get("fake", false):
+				tell = String(c["text"])
+				if not c["id"] in it["found"]:
+					it["found"].append(c["id"])
+		_caught_fake(it)
+		if rec.has("findings") and tell != "" and not tell in rec["findings"]:
+			(rec["findings"] as Array).append(tell)
+		ui.toast("Under the grime: %s" % tell)
+	else:
+		var before := int(it["value"])
+		it["value"] = roundi(before * RESTORE_GAIN)
+		if rec.has("findings"):
+			(rec["findings"] as Array).append("Cleaned and polished on the bench.")
+		ui.toast("Clean as the day it was made. The %s should fetch more now." % String(it["name"]).to_lower())
+	stop_restore()
+
 # ---- talking ------------------------------------------------------------------------------------------------------------------------
 
 ## At the door: "What do you want?" Once per caller. A robber's answer is the tell (no outfit settles it on its own).
@@ -445,6 +568,8 @@ func skip_tutorial() -> void:
 
 ## They ring. The porch camera comes on and shows them, with what the shop remembers about them.
 func _at_door() -> void:
+	if restoring:
+		stop_restore()
 	figure.look_at(PORCH + Vector3(0, 0, 1.0), Vector3.UP, true)
 	if not People.play(figure, "idle"):
 		People.stop(figure)
@@ -579,7 +704,7 @@ func _build_feed() -> void:
 ## The desk on your left behind the counter (Timberline's workbench) with the security monitor on it, its screen showing the porch
 ## camera. Look at it and the view zooms in to the screen; when someone rings, the view turns to it by itself.
 ## The monitor is a simple boxy CRT until its Meshy model arrives.
-const DESK := Vector3(-1.78, 0.0, -0.72)
+const DESK := Vector3(-1.0, 0.0, 0.24)      ## the monitor's spot on the counter's left wing
 const SCREEN_W := 0.655                     ## the porch camera's picture on the Meshy monitor's glass, as shares of the cabinet's size
 const SCREEN_H := 0.47
 const SCREEN_X := 0.018
@@ -588,10 +713,10 @@ var monitor_screen := Vector3.ZERO           ## the middle of the screen, world 
 var screen_mat: ShaderMaterial
 func _build_monitor() -> void:
 	var node: Node3D = shop["node"]
-	Shop._kit(node, "HK_workbench", DESK, PI * 0.5, Vector3(1.15, 0.78, 0.62))
+	## (the monitor and the bench sit on the counter's wings now: Shop builds them)
 	var mon := Node3D.new()
 	mon.name = "Monitor"
-	var top := DESK + Vector3(0, 0.79, 0)
+	var top := DESK + Vector3(0, Shop.COUNTER_TOP, 0)
 	mon.position = top
 	var to_eye := SHOP_EYE - top
 	mon.rotation.y = atan2(to_eye.x, to_eye.z)             ## its screen faces you behind the counter
@@ -941,6 +1066,7 @@ func load_game() -> bool:
 		node.scale = Vector3.ONE * 0.9
 		var ri := int(e.get("record", -1))
 		stock.append({"item": e["item"], "paid": int(e["paid"]), "node": node, "slot": slot, "record": purchases[ri] if ri >= 0 and ri < purchases.size() else {}})
+		_grime(node, float((e["item"] as Dictionary).get("grime", 0.0)))
 	return true
 
 ## Clears the shelves (before a saved week's pieces go back on them).
@@ -1046,9 +1172,16 @@ func _view(delta: float) -> void:
 	var to_mon := (monitor_screen - SHOP_EYE).normalized()
 	if not talk_focus and monitor_screen != Vector3.ZERO and (-want.z).angle_to(to_mon) < MONITOR_SNAP:
 		# looking at the monitor: lean in and zoom until its screen fills the middle of the view
-		eye = SHOP_EYE + to_mon * 0.85
+		eye = SHOP_EYE + to_mon * maxf(0.0, SHOP_EYE.distance_to(monitor_screen) - 0.62)   ## close enough that the screen fills the view
 		want = Basis.looking_at(monitor_screen - Vector3(0, 0.045, 0) - eye)    ## a little low, so the screen sits above the speech box
 		fov = 21.0
+		rate = TALK_EASE
+	elif (not talk_focus or state in ["idle", "walking"]) and (restoring or (-want.z).angle_to((BENCH_SPOT - SHOP_EYE).normalized()) < BENCH_SNAP):
+		# looking at the restoration bench: lean over it
+		var to_bench := (BENCH_SPOT - SHOP_EYE).normalized()
+		eye = SHOP_EYE + to_bench * 0.4
+		want = Basis.looking_at(BENCH_SPOT + Vector3(0, -0.02, 0) - eye)
+		fov = 42.0
 		rate = TALK_EASE
 	elif talk_focus and figure != null and is_instance_valid(figure) and figure.global_position.z > -3.9:
 		var info: Dictionary = visitor.get("info", {})
@@ -1081,6 +1214,9 @@ func _process(delta: float) -> void:
 			if edge != Vector2.ZERO:
 				_look(-edge.x * EDGE_SPEED * delta, -edge.y * EDGE_SPEED * 0.7 * delta)
 		_view(delta)
+		_bench_offer()
+	if restoring:
+		ui.bench_progress = 1.0 - float(restore_st["item"].get("grime", 0.0))
 	if pivot != null:
 		pivot.quaternion = pivot.quaternion.slerp(want_q, clampf(delta * 12.0, 0.0, 1.0))
 	if state == "inspect":
@@ -1190,6 +1326,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo \
 			and (event as InputEventKey).keycode == KEY_E and not state in ["inspect", "haggle"]:
 		pull_lamp()
+		return
+	if restoring:
+		if event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			_scrubbing = (event as InputEventMouseButton).pressed
+		elif event is InputEventMouseMotion and _scrubbing:
+			_scrub((event as InputEventMouseMotion).relative, (event as InputEventMouseMotion).position)
 		return
 	if state in VIEW_STATES and event is InputEventMouseButton and (event as InputEventMouseButton).pressed \
 			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT and _clicked_lamp((event as InputEventMouseButton).position):
@@ -1380,7 +1522,10 @@ func _buy(price: int) -> void:
 		n.global_transform = g
 		create_tween().tween_property(n, "global_position", slot + Vector3(0, 0.12, 0), 0.6).set_trans(Tween.TRANS_SINE)
 		create_tween().tween_property(n, "scale", Vector3.ONE * 0.9, 0.6)
+	if not item.has("grime"):
+		item["grime"] = 1.0                                  ## straight out of an attic: it wants a clean
 	stock.append({"item": item, "paid": price, "node": n, "slot": slot, "record": bought})
+	_grime(n, float(item["grime"]))
 	pivot.scale = Vector3.ONE
 	_leave(info["accept"])
 
