@@ -6,16 +6,17 @@ render_mode unshaded, cull_back;
 
 uniform sampler2D feed : source_color, filter_linear;
 uniform float on = 1.0;          // 0 when nobody is at the door: a dark, faintly glowing screen
-uniform float corner = 0.2;      // the rounded corners' radius, as a share of the screen's half-size
+uniform float shape = 4.0;       // the tube's outline: a superellipse (2 = oval, higher = squarer), big round corners, bowed sides
 uniform float bulge = 0.08;      // how much the picture bows out, like a curved tube
 
 void fragment() {
-	// the tube's rounded rectangle: nothing outside it
+	// the tube's outline: nothing outside it; the picture darkens into the glass's edge instead of stopping hard
 	vec2 d = abs(UV - vec2(0.5)) * 2.0;
-	vec2 q = d - vec2(1.0 - corner);
-	if (length(max(q, vec2(0.0))) > corner) {
+	float r = pow(pow(d.x, shape) + pow(d.y, shape), 1.0 / shape);
+	if (r > 1.0) {
 		discard;
 	}
+	float rim = smoothstep(1.0, 0.86, r);
 	// a slight barrel bulge
 	vec2 p = UV - vec2(0.5);
 	vec2 uv = vec2(0.5) + p * (1.0 - bulge * dot(p, p) * 4.0);
@@ -25,5 +26,5 @@ void fragment() {
 	c *= 1.0 - 0.12 * step(0.5, fract(uv.y * 120.0));
 	c *= 1.0 - 0.45 * smoothstep(0.2, 0.75, length(p * vec2(1.0, 1.2)));
 	c = mix(vec3(0.03, 0.05, 0.04), c * 1.15, on);
-	ALBEDO = c;
+	ALBEDO = mix(vec3(0.03, 0.04, 0.035), c, rim);
 }

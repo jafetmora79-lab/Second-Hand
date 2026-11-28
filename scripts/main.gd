@@ -573,8 +573,8 @@ func _build_feed() -> void:
 ## camera. Look at it and the view zooms in to the screen; when someone rings, the view turns to it by itself.
 ## The monitor is a simple boxy CRT until its Meshy model arrives.
 const DESK := Vector3(-1.78, 0.0, -0.72)
-const SCREEN_W := 0.57                     ## the porch camera's picture on the Meshy monitor's glass, as shares of the cabinet's size
-const SCREEN_H := 0.4
+const SCREEN_W := 0.62                     ## the porch camera's picture on the Meshy monitor's glass, as shares of the cabinet's size
+const SCREEN_H := 0.43
 const SCREEN_X := 0.0
 const SCREEN_Y := 0.6
 var monitor_screen := Vector3.ZERO           ## the middle of the screen, world space
