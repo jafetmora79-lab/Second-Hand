@@ -43,6 +43,8 @@ var _offer := 0
 var _offer_max := 50
 var _pips: Array = []                      ## patience as five drawn pips
 var _hint: PanelContainer                  ## the controls strip while inspecting
+var _hint_label: Label
+const HINT := "Drag: turn    Scroll: zoom    F: flip    R: reset"
 var _summary: Control = null
 var _feed_tex: Texture2D = null            ## the porch camera's picture: the portrait while someone is at the door
 var _tip: PanelContainer                   ## the guided first customer's tips, top left
@@ -308,8 +310,9 @@ func _build_hint() -> void:
 	_hint.visible = false
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hint)
-	var l := UiStyle.text_label("Drag: turn    Scroll: zoom    F: flip    R: reset    Click lid or E: open/shut", 13, UiStyle.CREAM)
+	var l := UiStyle.text_label(HINT + "    Click lid or E: open/shut", 13, UiStyle.CREAM)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_label = l
 	_hint.add_child(l)
 
 func _build_tip() -> void:
@@ -644,6 +647,13 @@ func show_inspect(item: Dictionary) -> void:
 	_haggle.visible = false
 	_inspect.visible = true
 	_hint.visible = true
+	match String(item.get("kind", "")):                   ## what clicking and E do on this piece
+		"music_box":
+			_hint_label.text = HINT + "    Click lid or E: open/shut    Click the key: wind it"
+		"toy_car":
+			_hint_label.text = HINT + "    Click the key or E: wind it"
+		_:
+			_hint_label.text = HINT + "    Click lid or E: open/shut"
 	refresh_inspect(item)
 
 ## A finding's heading, from what kind of clue it is.

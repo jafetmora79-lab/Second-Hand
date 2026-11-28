@@ -797,6 +797,7 @@ func _place_item() -> void:
 	want_q = rest_q
 	item_node = Models.build(item)
 	pivot.add_child(item_node)
+	_windup()
 	pivot.position = Shop.MAT + Vector3(0, REST_H, 0)
 	pivot.scale = Vector3.ONE * 0.01
 	create_tween().tween_property(pivot, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -1246,7 +1247,7 @@ func _loupe(delta: float) -> void:
 	var local: Vector3 = item_node.global_transform.affine_inverse() * (hit["position"] as Vector3)
 	var best := ""
 	for c: Dictionary in item["clues"]:
-		if c["id"] in item["found"]:
+		if c["id"] in item["found"] or c.get("ear_only", false):    ## (a broken spring is heard, not seen)
 			continue
 		if local.distance_to(c["pos"]) < LOUPE_REACH:
 			best = c["id"]
@@ -1414,6 +1415,46 @@ func _clicked_lamp(mp: Vector2) -> bool:
 	if cam.is_position_behind(at):
 		return false
 	return cam.unproject_position(at).distance_to(mp) < 70.0
+
+const SOUNDS := "res://assets/audio/"
+
+## A wind-up piece on the mat (the music box, the toy car): what winding it sounds like, and what it plays or does. A comb with teeth
+## missing drops two notes of the tune; a cheap tin movement plays it thin and buzzy; a broken spring lets the key turn and turn and
+## nothing happens. Hearing it is finding it: winding the key finds those clues as surely as the loupe.
+func _windup() -> void:
+	var lv := _living()
+	if lv == null or not lv.has_key():
+		return
+	var ids: Array = []
+	for c: Dictionary in item["clues"]:
+		ids.append(String(c["id"]))
+		if c.get("part", "") == "tin":
+			ids.append("tin")
+	lv.works = not "spring" in ids
+	lv.wind_sound = load(SOUNDS + ("wind.wav" if lv.works else "wind_slip.wav"))
+	var run := "car_run.wav"
+	var tail := 0.2
+	if item["kind"] == "music_box":
+		run = "tune_tin.wav" if "tin" in ids else ("tune_gap.wav" if "comb" in ids else "tune.wav")
+		tail = 2.3                                                    ## the last notes ring on after the drum stops
+	lv.run_sound = load(SOUNDS + run)
+	lv.run_len = maxf(1.0, (lv.run_sound as AudioStream).get_length() - tail)
+	lv.wound.connect(func(_runs: bool) -> void: _heard())
+
+## Clues you find by listening (winding the piece on the mat).
+func _heard() -> void:
+	if item.is_empty() or item_node == null:
+		return
+	var any := false
+	for c: Dictionary in item["clues"]:
+		if c.get("heard", false) and not c["id"] in item["found"]:
+			item["found"].append(c["id"])
+			ui.found_clue(c)
+			any = true
+			if c.get("fake", false):
+				_caught_fake(item)
+	if any:
+		ui.refresh_inspect(item)
 
 ## The piece's moving parts, if it has any.
 func _living() -> Living:

@@ -195,6 +195,8 @@ def main():
     wt = made["pocket_watch/925_1911"]
     col2 = tuple(int(v) for v in np.median(wt[..., :3][wt[..., 3] > 180], axis=0))
     save("pocket_watch/serials", drawn_letters("31840 · 77215", serif, 44, col2), 256)
+    # the tin toy car's maker, printed on its tin: a stand-in drawn here until the batch-7 mark atlas (docs/CHATGPT_PROMPTS.md) arrives
+    save("toy_car/brandt", drawn_letters("BRANDT · NÜRNBERG", serif, 44, (236, 222, 186)), 256)
 
 
 if __name__ == "__main__":

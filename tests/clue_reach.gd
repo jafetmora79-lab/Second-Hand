@@ -72,6 +72,8 @@ func run() -> void:
 			var t := tris_of(node)
 			var tells := 0
 			for c: Dictionary in item["clues"]:
+				if c.get("ear_only", false):                ## found by winding the key and listening, not with the loupe
+					continue
 				checked += 1
 				var where := "%s v%d '%s'" % [kind, v, c["id"]]
 				if c.get("fake", false):

@@ -10,7 +10,7 @@ const KINDS := {
 		"name": "Music box", "cat": "curios", "base": 180, "fake_value": 15,
 		"clues": [
 			{"id": "mark", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.075, 0), "text": "Struck into the wood underneath: \"J. Lindqvist, Oslo 1904\". A known maker.", "mult": 1.6, "label": "J.LINDQVIST\nOSLO 1904", "ink": "struck", "tex": "music_box/lindqvist_struck", "w": 0.085, "face": "bottom"},
-			{"id": "comb", "from": "top", "at": Vector2(-0.15, 0.35), "pos": Vector3(-0.021, 0.0, 0.048), "text": "The steel comb is missing two teeth: it plays, but not every note.", "mult": 0.7, "damage": true, "tex": "music_box/comb_gap", "w": 0.022},
+			{"id": "comb", "from": "top", "at": Vector2(-0.15, 0.35), "pos": Vector3(-0.021, 0.0, 0.048), "text": "The steel comb is missing two teeth: it plays, but not every note.", "mult": 0.7, "damage": true, "heard": true, "tex": "music_box/comb_gap", "w": 0.022},
 			{"id": "inlay", "from": "front", "at": Vector2(0.0, -0.35), "pos": Vector3(0.0, 0.08, 0.06), "text": "The flower inlay is real pearwood, cut by hand.", "mult": 1.15},
 		],
 	},
@@ -58,6 +58,15 @@ const KINDS := {
 			{"id": "water", "from": "top", "at": Vector2(0.0, 0.0), "pos": Vector3(0.0, 0.07, 0.0), "text": "An air gap at the top of the dome: some water has leaked out.", "mult": 0.85, "damage": true, "part": "airgap"},
 		],
 	},
+	"toy_car": {
+		"name": "Tin toy car", "cat": "toys", "base": 95, "fake_value": 8,
+		"clues": [
+			{"id": "mark", "from": "bottom", "at": Vector2(0, 0), "pos": Vector3(0, -0.04, 0), "text": "Printed on the tin underneath: \"Brandt, Nürnberg\". The Nuremberg toy works made the best tin toys in the world before the war.", "mult": 1.6, "label": "BRANDT
+NÜRNBERG", "ink": "printed", "tex": "toy_car/brandt", "w": 0.08, "face": "bottom"},
+			{"id": "spring", "from": "bottom", "at": Vector2(0.45, 0.4), "pos": Vector3(0, 9, 0), "text": "Wound up, the key just turns and turns: the mainspring is broken. It won't run.", "mult": 0.55, "damage": true, "heard": true, "ear_only": true},
+			{"id": "litho", "from": "left", "at": Vector2(0.1, 0.1), "pos": Vector3(0.0, 0.02, 0.03), "text": "The paint is printed on the tin before it was folded: the pattern runs unbroken into the seams. Proper German tinwork.", "mult": 1.25},
+		],
+	},
 	"jug": {
 		"name": "Stoneware jug", "cat": "household", "base": 55, "fake_value": 6,
 		"clues": [
@@ -77,10 +86,16 @@ const KINDS := {
 ## mark itself gives it away ("" when it does not), "tell": a fake clue elsewhere {from, at, text, part, part_text} or {}, "tint", "gloss"}.
 const MARK_IDS := ["mark", "hallmark", "signature", "maker", "stamp", "lens", "plate", "crown"]
 const COPIES := {
+	"toy_car": [
+		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "bottom", "at": Vector2(0.45, -0.35), "part": "screws", "text": "Cross-head screws hold the base on. The old German toy works folded tin tabs to close a car; never screws."}, "tint": Color(1.08, 0.98, 0.95), "gloss": -1.0},
+		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "left", "at": Vector2(0.0, -0.2), "part": "welds", "text": "A row of spot welds along the body: tin toys were folded and tabbed, not welded. A cheap new copy."}, "tint": Color(0.95, 0.95, 1.0), "gloss": -1.0},
+		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "top", "at": Vector2(0.1, 0.0), "part": "paint", "text": "The wear is painted on: even flat blotches of rust colour, not real rubbed-through tin."}, "tint": Color(1.05, 1.0, 0.92), "gloss": -1.0},
+		{"label": "", "ink": "printed", "mark_text": "", "tell": {"from": "right", "at": Vector2(0.0, 0.1), "part": "seam", "text": "A moulding seam runs down the body: it isn't tin at all, it's painted plastic."}, "tint": Color(1.1, 0.9, 0.9), "gloss": 0.3},
+	],
 	"music_box": [
 		{"label": "LINDQVIST", "ink": "printed", "tex": "music_box/lindqvist_printed", "mark_text": "A printed paper label glued underneath, not a stamp struck into the wood: a modern copy.", "tell": {}, "tint": Color(1.1, 1.02, 0.9), "gloss": -1.0},
 		{"label": "J.LINDQUIST\nOSLO 1904", "ink": "struck", "tex": "music_box/lindquist_struck", "mark_text": "It says \"Lindquist\". The maker spelled it Lindqvist, always.", "tell": {}, "tint": Color(0.92, 0.9, 1.05), "gloss": -1.0},
-		{"label": "", "ink": "struck", "mark_text": "", "tell": {"from": "top", "at": Vector2(-0.45, -0.3), "part": "tin", "text": "Under the lid: a stamped tin movement, not a steel comb. A cheap new box."}, "tint": Color(1.16, 1.08, 0.95), "gloss": -1.0},
+		{"label": "", "ink": "struck", "mark_text": "", "tell": {"from": "top", "at": Vector2(-0.45, -0.3), "part": "tin", "heard": true, "text": "Under the lid: a stamped tin movement, not a steel comb. A cheap new box."}, "tint": Color(1.16, 1.08, 0.95), "gloss": -1.0},
 		{"label": "", "ink": "struck", "mark_text": "", "tell": {"from": "back", "at": Vector2(0.0, 0.0), "part": "screws", "text": "Cross-head screws hold the back on. Lindqvist used slotted screws; these went in long after 1904."}, "tint": Color(0.8, 0.74, 0.72), "gloss": -1.0},
 	],
 	"pocket_watch": [

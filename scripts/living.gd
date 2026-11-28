@@ -13,6 +13,24 @@ const CHAIN_PULL := 18.0                   ## how strongly the chain falls back 
 const CHAIN_DAMP := 2.0                    ## how quickly its swing dies away
 const CHAIN_LAG := 0.82                    ## how much of the piece's turn the chain resists, each frame (1 = it stays put in the world)
 const CHAIN_REACH := 1.15                  ## the furthest (radians) it may swing from where it lay in the model
+const WIND_TIME := 1.4                     ## seconds to wind a key
+const WIND_TURNS := 2.5                    ## how far round it goes
+const DRUM_SPEED := 1.6                    ## a music box's brass drum, radians a second while it plays
+const WHEEL_SPEED := 22.0                  ## a toy car's wheels, radians a second while it runs
+
+## Wind-up pieces (the music box, the toy car): click the key (or press E on a piece with nothing to open) and it winds; then, if the
+## spring and the works are sound, the piece runs: the drum turns and the tune plays, or the wheels spin and the car buzzes, slowing as
+## the spring runs down while the key turns back. If the spring is broken the key turns, but nothing happens.
+signal wound(runs: bool)                   ## the key is wound: `runs` if the piece then plays or runs
+var wind_sound: AudioStream                ## set by the game: winding (a ratchet against the spring, or loose on a broken one)
+var run_sound: AudioStream                 ## ...and the tune, or the clockwork's whirr
+var _sfx: AudioStreamPlayer
+var _run: AudioStreamPlayer
+var works := true                          ## set by the game: false if the spring is broken
+var run_len := 6.0                         ## seconds it runs once wound (the game sets it to the sound's length)
+var winding := 0.0                         ## seconds of winding left
+var running := 0.0                         ## seconds of running left
+var _shake_base := Vector3.INF             ## the model's place, for the car's buzz
 
 var root: Node3D                           ## the item
 var parts: Array = []                      ## {"name", "node", "type", "rest" (Basis), "shape", and for hinges "axis", "closed", "t", "target";
@@ -28,7 +46,12 @@ func setup(item_root: Node3D, model: Node3D, data: Dictionary) -> void:
 			continue
 		var d: Dictionary = data[pname]
 		var p := {"name": pname, "node": node, "type": d["type"], "rest": node.transform.basis, "shape": null}
-		if d["type"] == "hinge":
+		if d["type"] == "spin":
+			var sa: Array = d["axis"]
+			p["axis"] = Vector3(sa[0], sa[1], sa[2]).normalized()
+			p["role"] = String(d["role"])                       ## key, drum or wheel
+			p["a"] = 0.0
+		elif d["type"] == "hinge":
 			var ax: Array = d["axis"]
 			p["axis"] = Vector3(ax[0], ax[1], ax[2]).normalized()
 			p["closed"] = float(d["closed"])
@@ -73,11 +96,42 @@ func has_hinges() -> bool:
 			return true
 	return false
 
-## Opens or shuts one part by name (or every hinge with "").
+## True if the piece has a key to wind.
+func has_key() -> bool:
+	for p: Dictionary in parts:
+		if p["type"] == "spin" and p["role"] == "key":
+			return true
+	return false
+
+## Opens or shuts one part by name (or every hinge with ""); clicking the key winds it, and E winds a piece with nothing to open.
 func toggle(pname: String = "") -> void:
+	for p: Dictionary in parts:
+		if p["type"] == "spin" and p["role"] == "key" and (p["name"] == pname or (pname == "" and not has_hinges())):
+			wind()
+			return
 	for p: Dictionary in parts:
 		if p["type"] == "hinge" and (pname == "" or p["name"] == pname):
 			p["target"] = 0.0 if float(p["target"]) > 0.5 else 1.0
+
+## Winds the key (not while it is already winding or running).
+func wind() -> bool:
+	if winding > 0.0 or running > 0.0 or not has_key():
+		return false
+	winding = WIND_TIME
+	_play("_sfx", wind_sound)
+	return true
+
+func _play(which: String, stream: AudioStream) -> void:
+	if stream == null:
+		return
+	var pl: AudioStreamPlayer = get(which)
+	if pl == null:
+		pl = AudioStreamPlayer.new()
+		pl.volume_db = -4.0
+		add_child(pl)
+		set(which, pl)
+	pl.stream = stream
+	pl.play()
 
 ## The part a collision shape belongs to ("" if none, or it is the body).
 static func part_of(shape: Node) -> String:
@@ -86,9 +140,20 @@ static func part_of(shape: Node) -> String:
 func _process(delta: float) -> void:
 	if root == null or not is_instance_valid(root) or not root.is_inside_tree():
 		return
+	var was_winding := winding > 0.0
+	winding = maxf(0.0, winding - delta)
+	if was_winding and winding == 0.0:
+		running = run_len if works else 0.0
+		if works:
+			_play("_run", run_sound)
+		wound.emit(works)
+	var was_running := running > 0.0
+	running = maxf(0.0, running - delta)
 	for p: Dictionary in parts:
 		var node: Node3D = p["node"]
-		if p["type"] == "hinge":
+		if p["type"] == "spin":
+			_spin(p, delta, was_winding)
+		elif p["type"] == "hinge":
 			var t: float = p["t"]
 			var target: float = p["target"]
 			if t == target:
@@ -99,6 +164,35 @@ func _process(delta: float) -> void:
 		else:
 			_swing(p, delta)
 		_follow(p)
+
+## A key, drum or wheel: the key turns forward as it is wound and slowly back as the piece runs; the drum and wheels turn while it
+## runs, slowing as the spring runs down.
+func _spin(p: Dictionary, delta: float, was_winding: bool) -> void:
+	var speed := 0.0
+	var left := running / maxf(run_len, 0.01)                  ## 1 just wound .. 0 run down
+	var ease_out := sqrt(left)
+	match p["role"]:
+		"key":
+			if was_winding:
+				speed = TAU * WIND_TURNS / WIND_TIME
+			elif running > 0.0:
+				speed = -TAU * WIND_TURNS / run_len
+		"drum":
+			speed = DRUM_SPEED * ease_out if running > 0.0 else 0.0
+		"wheel":
+			speed = WHEEL_SPEED * ease_out if running > 0.0 else 0.0
+	if speed == 0.0:
+		if p["role"] == "wheel" and _shake_base != Vector3.INF:     ## run down: the car settles where it was
+			((p["node"] as Node3D).get_parent() as Node3D).position = _shake_base
+		return
+	p["a"] = float(p["a"]) + speed * delta
+	(p["node"] as Node3D).transform.basis = Basis(p["axis"], float(p["a"])) * (p["rest"] as Basis)
+	if p["role"] == "wheel":                                     ## the clockwork's buzz shakes the little car
+		var model := (p["node"] as Node3D).get_parent() as Node3D
+		if _shake_base == Vector3.INF:
+			_shake_base = model.position
+		var buzz := 0.0015 * ease_out if running > 0.0 else 0.0
+		model.position = _shake_base + Vector3(sin(running * 71.0), absf(sin(running * 53.0)), cos(running * 67.0)) * buzz
 
 ## A hinged (or sliding, lifting, placed) part at its blend `t`.
 func _pose(p: Dictionary) -> void:
