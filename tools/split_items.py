@@ -18,11 +18,19 @@ WATCH_BODY = "(y > 0.1 and ((((x+0.05)**2+(z+0.05)**2)**0.5 < 0.335 and x < 0.26
 # per kind: parts in Blender coordinates (Z up). A hinge closes about `axis` until the part lies flat across `normal` at `cap`.
 SPY_LUG = Vector((-0.13, -0.425, 0.0))       ## where the cap's chain is fixed to the tube
 SPY_CAP = "((x + 0.2) ** 2 + (y + 0.26) ** 2) ** 0.5 < 0.097 and z < -0.075"
+# what Meshy left loose inside the new music box, by each piece's centre: five big thin sheets stretched across the inside from its
+# corners (they show as grey glass), and a small block floating beside the drum's end, twice over
+MB_LOOSE = [(-0.131, -0.053, -0.257), (-0.164, -0.055, -0.121), (0.224, -0.084, -0.265), (0.306, -0.059, -0.266), (0.257, 0.100, -0.121),
+            (-0.306, -0.039, -0.164), (-0.307, -0.037, -0.163)]
+MB_LOOSE_PICK = " or ".join("(abs(x - (%g)) < 0.004 and abs(y - (%g)) < 0.004 and abs(z - (%g)) < 0.004)" % c for c in MB_LOOSE)
+MB_COMB = "abs(x + 0.021) < 0.004 and abs(y + 0.079) < 0.004 and abs(z + 0.155) < 0.004"     ## (the comb's other half: one lone triangle)
 SPEC = {
     # the new music box (batch 7): its lid made the box's own size so it shuts flush; Meshy's double handle on the side replaced by one
     # brass winding key; the brass cylinder turns while it plays. Also gone: the big brass roller Meshy stood on the lid's back edge, and
     # a few stray white shards (huge thin triangles) inside the lid and the box
-    "music_box": {"drop_sheets": True, "double_sided": True, "raise_front": True, "delete_island": "(x > 0.36 and sx < 0.4) or (z > 0.05 and y > 0.18 and sx < 0.6) or (n <= 3 and max(sx, sy, sz) > 0.15)", "add_key": {"at": Vector((0.393, -0.06, -0.29)), "uv_from": "x > 0.36"},
+    "music_box": {"drop_sheets": True, "double_sided": True, "raise_front": True, "delete_island": "(x > 0.36 and sx < 0.4) or (z > 0.05 and y > 0.18 and sx < 0.6) or (n <= 3 and max(sx, sy, sz) > 0.15 and not (" + MB_COMB + ")) or " + MB_LOOSE_PICK, "add_key": {"at": Vector((0.393, -0.06, -0.29)), "uv_from": "x > 0.36"},
+                  "drop_slivers": ("abs(x) < 0.36 and abs(y) < 0.22 and -0.3 < z < -0.03", "abs(y + 0.02) < 0.035 and abs(z + 0.138) < 0.02 and sx < 0.4"),
+                  "delete_faces": [(0.247, -0.153, -0.242), (0.295, 0.102, -0.099)],   ## a slanted sheet across the front right corner; a white needle
                   "parts": [
         {"name": "Lid", "pick": "z > -0.03", "type": "hinge", "axis": "X", "normal": Vector((0, 0, 1)), "fit": True},
         {"name": "Key", "pick": "False", "island": "IS_KEY", "type": "spin", "role": "key", "spin_axis": Vector((1, 0, 0))},
@@ -337,6 +345,49 @@ def drop_sheets(obj):
     return len(gone)
 
 
+def delete_faces(obj, centres, tol=0.003):
+    """Deletes the faces whose centres are at `centres` (single stray faces on pieces that are otherwise right). Returns how many."""
+    me = obj.data
+    gone = [p.index for p in me.polygons if any((p.center - Vector(c)).length < tol for c in centres)]
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in gone], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+    return len(gone)
+
+
+def drop_slivers(obj, where, keep):
+    """Meshy's stray needles: long, very thin triangles running at a slant across the inside (they show as white or dark lines). Only on
+    small pieces (a real panel's thin faces run along the box's edges), only where `where` says (a face's centre x, y, z), and never on a
+    piece `keep` names (its centre x, y, z: the drum's own long facets). Returns how many went."""
+    me = obj.data
+    isl = islands(obj)
+    gone = []
+    for p in me.polygons:
+        x, y, z = p.center
+        if not eval(where):
+            continue
+        (ix, iy, iz), _, n, _f = isl[p.index]
+        sx, sy, sz = isl[p.index][1]
+        if n > 40 or eval(keep, {}, {"x": ix, "y": iy, "z": iz, "sx": sx, "sy": sy, "sz": sz}):
+            continue
+        vs = [me.vertices[i].co for i in p.vertices]
+        a, b = max(((vs[k], vs[(k + 1) % len(vs)]) for k in range(len(vs))), key=lambda e: (e[1] - e[0]).length)
+        L = (b - a).length
+        d = (b - a).normalized()
+        if L > 0.08 and max(abs(d.x), abs(d.y), abs(d.z)) < 0.985 and p.area / (L * L) < 0.05:
+            gone.append(p.index)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in gone], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+    return len(gone)
+
+
 def island_uv(obj, pick):
     """The average texture coordinate of the faces `pick` chooses (to paint something new in the same brass)."""
     me = obj.data
@@ -620,6 +671,37 @@ def clean_texture(part, r, pivot):
     return n
 
 
+def sink_underside(part, r, pivot, gap=0.004):
+    """The lid's top and its underside panel are each a few huge, slightly warped triangles; where the underside tilts up past the top
+    it shows through it (a dark patch with a shard in it, like a hole). With the lid shut, every underside vertex is kept `gap` under the
+    top surface above it. Returns how many vertices moved."""
+    from mathutils.geometry import intersect_point_tri_2d
+    me = part.data
+    mw = part.matrix_world
+    inv, ri = mw.inverted(), r.inverted()
+    ws = [r @ (mw @ v.co - pivot) + pivot for v in me.vertices]
+    def nz(p):
+        a, b, c = [ws[i] for i in p.vertices[:3]]
+        return (b - a).cross(c - a).normalized().z
+    ztop = max(w.z for w in ws)
+    tops = [p for p in me.polygons if len(p.vertices) == 3 and nz(p) > 0.7 and min(ws[i].z for i in p.vertices) > ztop - 0.03]
+    unders = set(i for p in me.polygons if nz(p) < -0.7 for i in p.vertices)
+    moved = 0
+    for i in unders:
+        w = ws[i]
+        for p in tops:
+            a, b, c = [ws[j] for j in p.vertices]
+            if intersect_point_tri_2d(w.to_2d(), a.to_2d(), b.to_2d(), c.to_2d()):
+                n = (b - a).cross(c - a)
+                zt = a.z - (n.x * (w.x - a.x) + n.y * (w.y - a.y)) / n.z      ## the top's height right above this vertex
+                if w.z > zt - gap:
+                    ws[i] = Vector((w.x, w.y, zt - gap))
+                    me.vertices[i].co = inv @ (ri @ (ws[i] - pivot) + pivot)
+                    moved += 1
+                break
+    return moved
+
+
 def fit_lid(kind, part, body, bv, r, pivot, shut):
     """Makes a lid exactly the size of the box it shuts on (Meshy's lid and box needn't match): measured shut, against the box's rim,
     and scaled in its own plane about its shut middle, so it covers the box edge to edge."""
@@ -661,6 +743,7 @@ def fit_lid(kind, part, body, bv, r, pivot, shut):
     bm.to_mesh(part.data)
     bm.free()
     print(kind, "holes in the lid's top filled:", len(res["faces"]))
+    print(kind, "lid underside lowered where it came through the top:", sink_underside(part, r, pivot))
     print(kind, "lid texture pixels painted over:", clean_texture(part, r, pivot))
     print(kind, "lid faces re-pointed at the lid's own wood:", odd_faces(part, r, pivot))
     print(kind, "...and painted over where they now point:", clean_texture(part, r, pivot))
@@ -792,6 +875,10 @@ def run(kind):
         junk = separate(body, "False", spec["delete_island"])
         print(kind, "deleted pieces' faces:", len(junk.data.polygons))
         bpy.data.objects.remove(junk, do_unlink=True)
+    if spec.get("drop_slivers"):
+        print(kind, "stray needle faces removed:", drop_slivers(body, *spec["drop_slivers"]))
+    if spec.get("delete_faces"):
+        print(kind, "single stray faces removed:", delete_faces(body, spec["delete_faces"]))
     if spec.get("add_key"):
         print(kind, "winding key faces:", add_key(body, spec["add_key"]))
     out = {}
