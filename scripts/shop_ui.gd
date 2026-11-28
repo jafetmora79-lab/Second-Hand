@@ -767,6 +767,9 @@ func _process(delta: float) -> void:
 	_speech.offset_left = lerpf(_speech.offset_left, side, clampf(delta * 10.0, 0.0, 1.0))
 	_speech.offset_right = _speech.offset_left + w
 	_fold_notes(delta)
+	var lb := get_node_or_null("LedgerButton") as Control
+	if lb != null:
+		lb.visible = not cinema                              ## no ledger over the title card or the day's shots
 	_update_portrait()
 	_toast_t = maxf(0.0, _toast_t - delta)
 	for fx: Array in _cash_fx:
@@ -839,6 +842,43 @@ func veil_to(a: float, secs: float) -> Tween:
 	var tw := create_tween()
 	tw.tween_property(_veil, "color:a", a, secs).set_trans(Tween.TRANS_SINE)
 	return tw
+
+## The title card when a week is saved: carry on from the day it reached, or start a new week.
+func show_menu(day: int, on_continue: Callable, on_new: Callable) -> void:
+	cinema = true
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UiStyle.parchment_box(32.0, "parch_tall"))
+	card.custom_minimum_size = Vector2(440, 0)
+	center.add_child(card)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	card.add_child(v)
+	var t := _ink("SECOND HAND", 34)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	var sub := _ink("Pinecrest, winter 1956", 13, UiStyle.INK_SOFT)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(sub)
+	v.add_child(_rule())
+	var go := Button.new()
+	go.text = "Continue: day %d" % day
+	UiStyle.style_button(go, "go", 18)
+	go.pressed.connect(func() -> void:
+		center.queue_free()
+		cinema = false
+		on_continue.call())
+	v.add_child(go)
+	var fresh := Button.new()
+	fresh.text = "New week"
+	UiStyle.style_button(fresh, "paper", 18)
+	fresh.pressed.connect(func() -> void:
+		center.queue_free()
+		cinema = false
+		on_new.call())
+	v.add_child(fresh)
 
 ## The opening or closing shot: everything on screen is put away (or the plaques come back).
 func set_cinema(on: bool) -> void:

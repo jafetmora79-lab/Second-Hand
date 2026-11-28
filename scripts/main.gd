@@ -131,7 +131,14 @@ func _ready() -> void:
 	cine_cam = Camera3D.new()
 	cine_cam.fov = 50.0
 	add_child(cine_cam)
-	if cinematics:
+	if cinematics and has_save():
+		ui.veil_to(1.0, 0.0)
+		ui.show_menu(saved_day(), func() -> void:
+			load_game()
+			_open_day(), func() -> void:
+			delete_save()
+			_open_day())
+	elif cinematics:
 		_open_day()
 	else:
 		_start_day()
@@ -766,6 +773,7 @@ func _end_day() -> void:
 		return
 	ui.show_summary("Closing time, day %d" % day, books + "\nThe town's opinion of you: %s." % _standing_word(), "Open tomorrow", func() -> void:
 		day += 1
+		save_game()
 		if cinematics:
 			ui.veil_to(1.0, 0.5).finished.connect(_open_day)
 		else:
@@ -842,6 +850,106 @@ func _open_day() -> void:
 	ui.veil_to(0.0, 0.6)
 	_start_day()
 
+# ---- saving: the week is kept between days (user://, the browser's own storage on the web) ---------------------------------------
+
+const SAVE_PATH := "user://week.save"
+const SAVE_VERSION := 1
+## What a save holds, with the values a new week starts from: an older save missing a field gets it from here.
+const SAVE_DEFAULTS := {"version": 1, "day": 1, "money": START_MONEY, "standing": STANDING_START, "week_profit": 0, "rep": {}, "town": {},
+	"purchases": [], "accounts": [], "tutorial": -1, "seed": DEFAULT_SEED, "rng_state": 0, "stock": []}
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+## The day a saved week would continue from (0 if none or unreadable).
+func saved_day() -> int:
+	var d := _read_save()
+	return int(d.get("day", 0))
+
+func delete_save() -> void:
+	if has_save():
+		var dir := DirAccess.open("user://")
+		if dir != null:
+			dir.remove(SAVE_PATH.get_file())
+
+## Keeps the week as it stands between days: the money and the town, every caller's memory, the ledger, the shelves, and the dice
+## (so tomorrow's callers are the same ones they'd have been). Only in real play: tests and the simulation never touch it.
+func save_game() -> void:
+	if not cinematics:
+		return
+	var shelf: Array = []
+	for st: Dictionary in stock:
+		shelf.append({"item": st["item"], "paid": st["paid"], "record": purchases.find(st.get("record", {}))})
+	var data := {"version": SAVE_VERSION, "day": day, "money": money, "standing": standing, "week_profit": week_profit, "rep": rep,
+		"town": town, "purchases": purchases, "accounts": accounts, "tutorial": tutorial, "seed": game_seed, "rng_state": rng.state,
+		"stock": shelf}
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		push_warning("couldn't save the week: %s" % FileAccess.get_open_error())
+		return
+	f.store_var(data)
+	f.close()
+
+func _read_save() -> Dictionary:
+	if not has_save():
+		return {}
+	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if f == null:
+		return {}
+	var d = f.get_var()
+	f.close()
+	return d if d is Dictionary else {}
+
+## Fills in what an older save didn't have (and refuses one from a newer game than this).
+static func migrate(d: Dictionary) -> Dictionary:
+	if int(d.get("version", 0)) > SAVE_VERSION:
+		return {}
+	var out := d.duplicate(true)
+	out.merge(SAVE_DEFAULTS.duplicate(true), false)
+	for b: Dictionary in out["purchases"]:
+		b.merge({"kind": "", "findings": [], "status": "shelf"}, false)
+	return out
+
+## Continues a saved week from the start of its next day.
+func load_game() -> bool:
+	var d := migrate(_read_save())
+	if d.is_empty():
+		return false
+	day = int(d["day"])
+	money = int(d["money"])
+	standing = int(d["standing"])
+	week_profit = int(d["week_profit"])
+	rep = d["rep"]
+	for id: String in rep.keys():
+		_rec(id)                                              ## each caller's record gets any fields it was saved without
+	town = d["town"]
+	town.merge({"fakes_exposed": 0, "pell_sales": 0, "jo_sales": 0}, false)
+	purchases = d["purchases"]
+	accounts = d["accounts"]
+	tutorial = int(d["tutorial"])
+	game_seed = int(d["seed"])
+	rng.seed = game_seed
+	rng.state = int(d["rng_state"])
+	_shown_stock_reset()
+	for e: Dictionary in d["stock"]:
+		var slot := _free_slot()
+		if slot == Vector3.INF:
+			break
+		var node := Models.build(e["item"])
+		add_child(node)
+		node.global_position = slot + Vector3(0, 0.12, 0)
+		node.scale = Vector3.ONE * 0.9
+		var ri := int(e.get("record", -1))
+		stock.append({"item": e["item"], "paid": int(e["paid"]), "node": node, "slot": slot, "record": purchases[ri] if ri >= 0 and ri < purchases.size() else {}})
+	return true
+
+## Clears the shelves (before a saved week's pieces go back on them).
+func _shown_stock_reset() -> void:
+	for st: Dictionary in stock:
+		if st["node"] != null and is_instance_valid(st["node"]):
+			(st["node"] as Node3D).queue_free()
+	stock.clear()
+
 ## How the town speaks of the shop.
 func _standing_word() -> String:
 	if standing >= 80:
@@ -857,6 +965,7 @@ func _standing_word() -> String:
 ## Rent day's close: one of three endings.
 func _ending(books: String) -> void:
 	state = "over"
+	delete_save()
 	var week := "\n\nThis week: profit on sales $%d. The town's opinion of you: %s." % [week_profit, _standing_word()]
 	if money < RENT:
 		ending = "The Last Customer"
