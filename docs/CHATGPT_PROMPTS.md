@@ -134,3 +134,31 @@ Make 5 separate square images, one at a time, all in exactly the same style. Eac
 Make 1 square image: a woven rug seen straight down from directly above, filling the whole frame edge to edge with no background showing. A burgundy field with a cream and dark brown geometric border, a simple diamond pattern in the middle, slightly worn and faded at the edges. Subtle pixel-art texture, warm muted palette, 1950s mountain cabin. Flat, evenly lit, no shadows, no perspective, no furniture, no text.
 ```
 Prompt A's five go through Meshy. The clock is asked for without hands, and the monitor with its screen facing forward, so the game can give the clock moving hands and put the live porch camera on the monitor's screen. The rug in Prompt B is used directly as a floor texture: no Meshy credits needed.
+
+# Batch 6: more antiques, and the appraisal mat (three prompts)
+
+**Prompt A: five antiques**
+```
+Make 5 separate square images, one at a time, all in exactly the same style. Each image: a single antique object as a standalone 3D game asset, isolated on a plain white background, three-quarter view from slightly above, the whole object in frame, plain undersides, no people, no scenery, no text, no logos, no labels. Style for all: semi-realistic low-poly with chunky shapes and a subtle pixel-art texture, warm muted palette, antiques in a 1950s snowy mountain-town antique shop.
+1. A brass telescoping spyglass, three sections drawn partly out, a worn leather grip on the widest section, a brass lens cap on a short chain.
+2. A round brass aneroid barometer in a carved oak frame, a cream dial with a black needle and a brass reference needle, no words on the dial.
+3. A brass carriage clock with glass side panels and a top handle, a cream enamel dial with black numerals and hands, a small hinged door at the back.
+4. A cast-iron and wood box coffee grinder: a square wooden body, a cast-iron hopper and crank handle on top, a small wooden drawer at the front with a brass knob, drawer slightly open.
+5. A hammered copper tea kettle with a brass handle wrapped in wicker, a hinged lid, slightly tarnished, a few small dents.
+```
+
+**Prompt B: five more antiques**
+```
+Make 5 separate square images, one at a time, all in exactly the same style. Each image: a single antique object as a standalone 3D game asset, isolated on a plain white background, three-quarter view from slightly above, the whole object in frame, plain undersides, no people, no scenery, no text, no logos, no labels. Style for all: semi-realistic low-poly with chunky shapes and a subtle pixel-art texture, warm muted palette, antiques in a 1950s snowy mountain-town antique shop.
+1. A 1930s tin wind-up toy car, lithographed red and cream paint worn at the edges, a key in its side, rubber tyres.
+2. A hand-carved and hand-painted wooden duck decoy, a mallard drake, the paint faded and chipped, glass eyes.
+3. A cast-iron mechanical coin bank shaped like a seated dog on a base, painted, the paint worn through to iron in places, a coin slot in its back.
+4. A 1920s candlestick telephone: a black upright stand with a mouthpiece on top, a separate earpiece hanging on a hook at the side by a cloth cord, a round dial-less base.
+5. A wooden music box with a hinged lid, a pale floral marquetry inlay on the front and on the lid, small brass corner fittings, a brass winding key on one side, the lid open showing a brass cylinder and a steel comb inside.
+```
+
+**Prompt C: the appraisal mat (a texture, not a 3D model)**
+```
+Make 1 square image: a jeweller's appraisal mat seen straight down from directly above, filling the whole frame edge to edge with no background showing. A deep green baize felt surface, a stitched dark brown leather border all round, small brass studs at the four corners, slightly worn and faded in the middle where things are set down. Subtle pixel-art texture, warm muted palette. Flat, evenly lit, no shadows, no perspective, no objects on it, no text.
+```
+Prompt A and B items go through Meshy (15 credits each with meshy-t2 + meshy-n1, as for the props); the music box in Prompt B replaces the old model, whose panels have overlapping layers that flicker. Prompt C is used directly as the mat's texture, no credits.
