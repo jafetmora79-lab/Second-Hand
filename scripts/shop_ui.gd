@@ -647,13 +647,17 @@ func show_inspect(item: Dictionary) -> void:
 	_haggle.visible = false
 	_inspect.visible = true
 	_hint.visible = true
-	match String(item.get("kind", "")):                   ## what clicking and E do on this piece
-		"music_box":
-			_hint_label.text = HINT + "    Click lid or E: open/shut    Click the key: wind it"
-		"toy_car":
-			_hint_label.text = HINT + "    Click the key or E: wind it"
-		_:
-			_hint_label.text = HINT + "    Click lid or E: open/shut"
+	var lv: Living = game._living()                       ## what clicking and E do on this piece, from the parts it has
+	var lid := lv != null and lv.has_hinges()
+	var key := lv != null and lv.has_key()
+	if lid and key:
+		_hint_label.text = HINT + "    Click lid or E: open/shut    Click the key: wind it"
+	elif key:
+		_hint_label.text = HINT + "    Click the key or E: wind it"
+	elif lid:
+		_hint_label.text = HINT + "    Click lid or E: open/shut"
+	else:
+		_hint_label.text = HINT
 	refresh_inspect(item)
 
 ## A finding's heading, from what kind of clue it is.
@@ -694,6 +698,7 @@ func refresh_inspect(item: Dictionary) -> void:
 func show_haggle(item: Dictionary, ask: int, patience: int) -> void:
 	for c in _actions.get_children():
 		c.queue_free()
+	var again := _haggle.visible                          ## shown again after their counter: keep the offer you had, not a fresh lowball
 	_inspect.visible = false
 	_hint.visible = false
 	_haggle.visible = true
@@ -703,7 +708,7 @@ func show_haggle(item: Dictionary, ask: int, patience: int) -> void:
 	for k in _pips.size():
 		(_pips[k] as TextureRect).texture = UiStyle.ui_tex("pip_full" if k < patience else "pip_empty")
 	_offer_max = int(maxf(ask * 1.2, 50))
-	_offer = clampi(roundi(minf(ask * 0.6, est.y) / 5.0) * 5, 5, _offer_max)
+	_offer = clampi(_offer if again else roundi(minf(ask * 0.6, est.y) / 5.0) * 5, 5, _offer_max)
 	_offer_label.text = "$%d" % _offer
 
 func found_clue(c: Dictionary) -> void:
@@ -999,11 +1004,13 @@ func _draw() -> void:
 			t_left = _tip.position.x
 			t_right = _tip.position.x + _tip.size.x
 			t_top = _tip.position.y + _tip.size.y + 12.0
-		var tw := clampf(t_right - t_left - 28.0, 200.0, 640.0)
+		var pad_x := 28.0                                        ## clear of the slip's 16 px gilt border, with room to breathe
+		var pad_y := 20.0
+		var tw := clampf(t_right - t_left - pad_x * 2.0, 200.0, 640.0)
 		var fs := UiStyle.px(18)
 		var ts := font.get_multiline_string_size(_toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs)
-		var rr := Rect2(Vector2((t_left + t_right) * 0.5 - tw * 0.5 - 14, t_top), Vector2(tw + 28, ts.y + 20))
+		var rr := Rect2(Vector2((t_left + t_right) * 0.5 - tw * 0.5 - pad_x, t_top), Vector2(tw + pad_x * 2.0, ts.y + pad_y * 2.0))
 		var sb := UiStyle.parchment_box(0.0, "parch_strip")
 		sb.modulate_color = Color(1, 1, 1, fade)
 		draw_style_box(sb, rr)
-		draw_multiline_string(font, Vector2(rr.position.x + 14, rr.position.y + 10 + font.get_ascent(fs)), _toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs, -1, Color(UiStyle.INK, fade))
+		draw_multiline_string(font, Vector2(rr.position.x + pad_x, rr.position.y + pad_y + font.get_ascent(fs)), _toast_text, HORIZONTAL_ALIGNMENT_CENTER, tw, fs, -1, Color(UiStyle.INK, fade))

@@ -1276,7 +1276,19 @@ func _loupe(delta: float) -> void:
 
 ## How far into the edge band the mouse is, -1..1 on each axis (0 in the middle of the screen, over a button or panel, or outside
 ## the window), so moving the mouse to the side of the screen turns the view that way, faster the nearer the edge.
+var _mouse_seen := false                   ## the mouse has moved over the game since it last left: until then its position is (0, 0), a corner
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_mouse_seen = true
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_MOUSE_EXIT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_mouse_seen = false
+
 func _edge_look() -> Vector2:
+	if not _mouse_seen:                      ## (a page just loaded, or the mouse off over the browser's tabs: don't swing the view to the ceiling)
+		return Vector2.ZERO
 	var vp := get_viewport()
 	var size := vp.get_visible_rect().size
 	var m := vp.get_mouse_position()
