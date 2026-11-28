@@ -112,6 +112,17 @@ func _ready() -> void:
 	pivot = Node3D.new()
 	pivot.position = Shop.MAT + Vector3(0, 0.15, 0)
 	add_child(pivot)
+	var grade := CanvasLayer.new()                       ## the Winter Amber vignette and grain, under the HUD
+	grade.layer = 0
+	add_child(grade)
+	var veil := ColorRect.new()
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	amber = ShaderMaterial.new()
+	amber.shader = load("res://shaders/winter_amber.gdshader") as Shader
+	amber.set_shader_parameter("inspection", 0.0)
+	veil.material = amber
+	grade.add_child(veil)
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	ui = ShopUi.new()
@@ -767,6 +778,7 @@ func _end_day() -> void:
 ## come up, and the camera moves in toward the door before you're back behind the counter.
 var cinematics := true                     ## tests switch the shots off
 var cine_cam: Camera3D
+var amber: ShaderMaterial                  ## the Winter Amber overlay: eases off while you inspect
 const SHOT_NEAR := [Vector3(-1.6, 1.6, -7.4), Vector3(-0.8, 1.5, -4.0)]      ## [eye, looking at]: close in on the door and window
 const SHOT_FAR := [Vector3(-2.8, 2.5, -14.5), Vector3(-0.9, 1.8, -4.0)]      ## back across the lane: the shop, pines, the peaks behind
 
@@ -941,6 +953,9 @@ func _view(delta: float) -> void:
 	cam.fov = lerpf(cam.fov, fov, k)
 
 func _process(delta: float) -> void:
+	if amber != null:
+		var k: float = amber.get_shader_parameter("inspection")
+		amber.set_shader_parameter("inspection", move_toward(k, 1.0 if state in ["inspect", "haggle"] else 0.0, delta * 2.5))
 	if state == "inspect" or state == "haggle":
 		var dir := Vector3(0, 0.55, 0.85).normalized()
 		var target := pivot.global_position

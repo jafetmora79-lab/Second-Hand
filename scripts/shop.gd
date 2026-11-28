@@ -98,15 +98,15 @@ static func build(root: Node3D) -> Dictionary:
 	lamp.rotation = Vector3(-PI * 0.5, 0, 0.45)
 	lamp.spot_angle = 38.0
 	lamp.spot_range = 2.0
-	lamp.light_energy = 2.2
-	lamp.light_color = Color(1.0, 0.86, 0.66)
+	lamp.light_energy = 2.5
+	lamp.light_color = Color(1.0, 0.94, 0.83)
 	lamp.shadow_enabled = true
 	shop.add_child(lamp)
 	var room_light := OmniLight3D.new()
 	room_light.position = Vector3(0, 2.5, -1.8)
 	room_light.omni_range = 7.0
-	room_light.light_energy = 1.0
-	room_light.light_color = Color(1.0, 0.82, 0.6)
+	room_light.light_energy = 0.85
+	room_light.light_color = Color(1.0, 0.86, 0.70)
 	shop.add_child(room_light)
 	# strings of warm bulbs slung under the beams (Timberline's string lights), in place of a lantern hanging in mid-air
 	for z: float in [-3.0, -1.5]:
@@ -120,8 +120,8 @@ static func build(root: Node3D) -> Dictionary:
 	var cold := OmniLight3D.new()
 	cold.position = Vector3(1.4, 1.6, -3.3)
 	cold.omni_range = 3.5
-	cold.light_energy = 0.6
-	cold.light_color = Color(0.6, 0.72, 1.0)
+	cold.light_energy = 0.85
+	cold.light_color = Color(0.65, 0.80, 1.0)
 	shop.add_child(cold)
 	# the electric door (Timberline's shop door): hinged on its left, swings in when you buzz someone through
 	var hinge := Node3D.new()
@@ -154,25 +154,27 @@ static func build(root: Node3D) -> Dictionary:
 	var shelves: Array = []
 	for side: float in [-1.0, 1.0]:
 		_prop(shop, "shop/shelves", Vector3(side * 2.6, 0, -2.1), 2.3, side * -PI * 0.5)
-		for y: float in SHELF_Y:
-			for dz: float in [-0.55, 0.0, 0.55]:
+	for y: float in [0.81, 1.28, 1.73, 0.29]:                ## eye level first, then the top, then the bottom
+		for dz: float in [0.0, -0.55, 0.55]:
+			for side: float in [-1.0, 1.0]:                  ## left and right in turn
 				shelves.append(Vector3(side * 2.58, y, -2.1 + dz))
 	# a wood stove in the corner (Timberline's), glowing, a log pile by it
-	if _prop(shop, "shop/FURN_stove", Vector3(-2.4, 0, 0.4), 1.0, PI * 0.5) == null:
-		_box(shop, Vector3(-2.4, 0.45, 0.4), Vector3(0.6, 0.9, 0.6), _mat(Color(0.1, 0.1, 0.11), 0.6, 0.4))
-	_prop(shop, "shop/HK_log_pile", Vector3(-2.55, 0, -0.35), 0.45, 0.2)
+	if _prop(shop, "shop/FURN_stove", Vector3(-0.77, 0, -3.55), 1.0, STOVE_YAW) == null:
+		_box(shop, Vector3(-0.77, 0.45, -3.55), Vector3(0.6, 0.9, 0.6), _mat(Color(0.1, 0.1, 0.11), 0.6, 0.4))
+	_prop(shop, "shop/HK_log_pile", Vector3(-0.08, 0, -3.62), 0.42, 0.1)
+	_prop(shop, "shop/HK_pew", Vector3(1.4, 0, -3.62), 0.0, 0.0, 1, Vector3(1.7, 0.78, 0.0))       ## a bench under the window
 	var stove_light := OmniLight3D.new()
-	stove_light.position = Vector3(-2.3, 0.6, -0.1)
-	stove_light.omni_range = 2.5
+	stove_light.position = Vector3(-0.77, 0.6, -3.1)
+	stove_light.omni_range = 2.6
 	stove_light.light_color = Color(1.0, 0.55, 0.25)
-	stove_light.light_energy = 0.8
+	stove_light.light_energy = 0.9
 	shop.add_child(stove_light)
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.05, 0.05, 0.06)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.5, 0.48)
-	env.ambient_light_energy = 0.35
+	env.ambient_light_energy = 0.4
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	Outside.sky_env(env)
 	Outside.build(root)
@@ -215,6 +217,7 @@ static func light_front(shop_node: Node3D, on: bool) -> void:
 ## Loads a model from assets/<file>.glb, scales it to `h` tall (or into `fit_box` when given), stands it on the floor at `pos`, turned `yaw`.
 ## The heights of the four shelves in the shelving unit when it stands 2.3 m tall (measured off the model).
 const SHELF_Y := [0.29, 0.81, 1.28, 1.73]
+const STOVE_YAW := 0.0                     ## the stove's door faces the room
 
 ## The Meshy glass counter, 2.4 m wide, its paned front toward the customer and its security screens on their side of the mat.
 ## Its glass is made see-through by a shader (shaders/glass_case.gdshader). Returns the spots inside the case for the shop's collection.
@@ -304,7 +307,7 @@ static func _prop(root: Node3D, file: String, pos: Vector3, h: float, yaw: float
 ## Furnishes the shop with Timberline's own props: a barrel of odds and ends, an axe; outside, steps,
 ## a mailbox and a lantern by the door.
 static func _dress(shop: Node3D) -> void:
-	_prop(shop, "shop/HK_barrel_crate", Vector3(2.15, 0, -1.25), 0.8, 0.4)
+	_prop(shop, "shop/HK_barrel_crate", Vector3(2.55, 0, -0.85), 0.8, 0.4)
 	_prop(shop, "shop/TOOL_axe", Vector3(2.85, 0, -0.55), 0.85, 0.3)
 	# a pitched roof like the town's cabins (Timberline's roof section and log gables), sitting on the walls; the plank ceiling hides it inside
 	var span := 6.0
