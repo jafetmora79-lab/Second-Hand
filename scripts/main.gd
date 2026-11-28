@@ -165,8 +165,12 @@ func _start_day() -> void:
 		if day == RENT_DAY:                               ## rent day: both buyers, last, each willing to take several pieces
 			queue.append({"type": "buyer", "id": "collector_b", "many": true})
 			queue.append({"type": "buyer", "id": "decorator", "many": true})
-	if day >= 2 and rng.randf() < 0.4:                 ## from day 2, trouble: a masked man, or the stranger turned bad
-		queue.insert(rng.randi_range(1, queue.size()), {"type": "robber", "id": "robber" if rng.randf() < 0.6 else "drifter"})
+	if day >= 2 and rng.randf() < 0.25:                ## from day 2, trouble: a masked man, now and then
+		queue.insert(rng.randi_range(1, queue.size()), {"type": "robber", "id": "robber"})
+	if day >= 2:                                      ## the stranger: desperate men rob, men with work and a friend in town don't
+		for v: Dictionary in queue:
+			if v["type"] == "seller" and v["id"] == "drifter" and not v.get("legit", false) and rng.randf() < _drifter_risk():
+				v["type"] = "robber"
 	ui.show_day_title("Day %d" % day, "Rent of $%d due on day %d" % [RENT, RENT_DAY] if day < RENT_DAY else "Rent is due tonight: $%d" % RENT)
 	state = "idle"
 	day_total = maxi(1, queue.size())
@@ -233,6 +237,152 @@ func _turn(f: Node3D, yaw: float) -> void:
 		if is_instance_valid(f):
 			f.rotation = Vector3(0, lerp_angle(y0, yaw, t), 0), 0.0, 1.0, TURN_TIME).set_trans(Tween.TRANS_SINE)
 
+# ---- talking ------------------------------------------------------------------------------------------------------------------------
+
+## At the door: "What do you want?" Once per caller. A robber's answer is the tell (no outfit settles it on its own).
+func ask_door() -> void:
+	if state != "at_door" or visitor.get("asked", false):
+		return
+	visitor["asked"] = true
+	var id: String = visitor["id"]
+	var line: String
+	if visitor["type"] == "robber":
+		line = Dialogue.DOOR["robber"] if id == "robber" else Dialogue.DOOR["robbing_drifter"]
+	elif visitor["type"] == "buyer":
+		line = Dialogue.DOOR[id]
+	else:
+		var r := _rec(id).duplicate()
+		r["visits"] = int(r["visits"]) + 1
+		line = "\"%s\"" % Dialogue.greeting(id, r, town)
+	var r2: Dictionary = rep.get(id, {})
+	var who := String(visitor["info"]["name"]) if int(r2.get("visits", 0)) > 0 else "Someone at the door"
+	ui.say(who, line + "\n" + _memory(id))
+	ui.show_door_actions(false)
+
+## True while you can still say something to the seller this visit.
+func can_talk() -> bool:
+	return state == "talk" and visitor["type"] == "seller" and not visitor.get("talked", false) and Dialogue.SELLERS.has(visitor["id"])
+
+## True once you've found the evidence that the piece on the mat is a copy (and haven't said so yet).
+func can_confront() -> bool:
+	return state == "talk" and visitor["type"] == "seller" and not visitor.get("confronted", false) and Items.known_fake(item)
+
+## One of the three things you can say to a seller, once a visit.
+func talk(kind: String) -> void:
+	if not can_talk():
+		return
+	visitor["talked"] = true
+	var id: String = visitor["id"]
+	var d: Dictionary = Dialogue.SELLERS[id]
+	var info: Dictionary = visitor["info"]
+	var line: String
+	match kind:
+		"friendly":                                      ## warmth: a little more patience, a little more trust
+			patience += 1
+			_trust(id, 3)
+			line = "\"%s\"" % d["friendly"]
+		"firm":                                          ## business: they come down a little, and like you a little less
+			ask = maxi(int(item["floor"]), roundi(ask * 0.92 / 5.0) * 5)
+			_trust(id, -1)
+			line = "\"%s %s, then.\"" % [d["firm"], "$%d" % ask]
+		_:                                               ## where it came from: a rumour if they trust you, a bristle if not
+			var r := _rec(id)
+			if int(r["trust"]) >= 55 or int(r["fair_deals"]) >= 1:
+				r["rumor_heard"] = true
+				line = "\"%s\"" % d["rumor"]
+				_note(id, d["rumor"])
+			else:
+				_trust(id, -2)
+				line = "\"%s\"" % d["suspicious"]
+	if kind != "firm":
+		line += "\nStill asking $%d." % ask                ## the price stays on screen
+	_say(info["name"], line)
+	ui.show_seller_actions()
+
+## You show the seller what gives the piece away. They take it back and go (whoever fooled them, it wasn't you).
+func confront() -> void:
+	if not can_confront():
+		return
+	visitor["confronted"] = true
+	var id: String = visitor["id"]
+	var info: Dictionary = visitor["info"]
+	_caught_fake(item)
+	_remember(id, "fake_exposed")
+	town["fakes_exposed"] += 1
+	_standing(2, "honest_eye")
+	_note(id, "Brought in a copy of a %s; you showed them the tell." % String(item["name"]).to_lower())
+	_say(info["name"], "\"%s\"" % Dialogue.SELLERS[id]["fake"])
+	ui.hide_actions()
+	state = "refused"
+	get_tree().create_timer(2.8).timeout.connect(func() -> void: _leave(String(info["leave"])))
+
+# ---- the ledger: only what you've found out --------------------------------------------------------------------------------------
+
+## Everyone who has come in: name, how they feel about you, what they've told you.
+func ledger_customers() -> Array:
+	var out: Array = []
+	for id: String in rep.keys():
+		var r := _rec(id)
+		if int(r["visits"]) == 0:
+			continue
+		var name: String
+		if People.FOLK.has(id):
+			name = People.FOLK[id]["name"]
+		elif People.BUYERS.has(id):
+			name = People.BUYERS[id]["name"]
+		else:
+			name = People.ROBBERS[id]["name"]
+		var facts: Array = ["%d visit%s" % [r["visits"], "" if int(r["visits"]) == 1 else "s"]]
+		if People.FOLK.has(id):
+			facts.append(Dialogue.trust_word(int(r["trust"])))
+			if int(r["fair_deals"]) > 0:
+				facts.append("%d fair deal%s" % [r["fair_deals"], "" if int(r["fair_deals"]) == 1 else "s"])
+			if int(r["fakes"]) > 0:
+				facts.append("brought %d fake%s" % [r["fakes"], "" if int(r["fakes"]) == 1 else "s"])
+		if int(r["robbed"]) > 0:
+			facts.append("ROBBED THE SHOP")
+		if id == "drifter" and r["employed"]:
+			facts.append("works at the lodge")
+		out.append({"name": name, "facts": ", ".join(facts), "notes": (r["notes"] as Array).duplicate()})
+	return out
+
+## Every piece you've bought, what you found on it, and where it went.
+func ledger_antiques() -> Array:
+	var out: Array = []
+	for b: Dictionary in purchases:
+		var fate := "on the shelf"
+		match String(b["status"]):
+			"sold":
+				fate = "sold to %s for $%d (%s$%d)" % [b["to"], b["sold_for"], "+" if int(b["sold_for"]) >= int(b["paid"]) else "-", absi(int(b["sold_for"]) - int(b["paid"]))]
+			"stolen":
+				fate = "stolen"
+		out.append({"name": "%s, from %s, day %d: paid $%d" % [b["name"], b["from"], b["day"], b["paid"]], "fate": fate, "findings": b["findings"]})
+	return out
+
+## Each day's books, and today's so far.
+func ledger_accounts() -> Array:
+	var out: Array = accounts.duplicate()
+	if state != "day_end" and state != "over":
+		out.append({"day": day, "spent": day_log["spent"], "earned": day_log["earned"], "profit": day_log["profit"], "robbed": day_log["robbed"],
+			"bought": day_log["bought"], "sold": day_log["sold"], "money": money, "today": true})
+	return out
+
+## How likely the stranger is to come with a gun instead of something to sell: by how far he trusts you, nothing once he has work.
+func _drifter_risk() -> float:
+	var r := _rec("drifter")
+	if r["employed"]:
+		return 0.0
+	var t := int(r["trust"])
+	if t < 30:
+		return 0.65
+	if t < 45:
+		return 0.4
+	if t < 60:
+		return 0.15
+	if t < 75:
+		return 0.05
+	return 0.0
+
 ## True if the buyer `id` collects anything on the shelves right now.
 func _wants_any(id: String) -> bool:
 	var wanted: Array = People.BUYERS[id]["want"]
@@ -295,7 +445,7 @@ func _at_door() -> void:
 ## What the shop remembers about a caller, for the camera.
 func _memory(id: String) -> String:
 	var r: Dictionary = rep.get(id, {})
-	if r.is_empty():
+	if r.is_empty() or int(r.get("visits", 0)) == 0:
 		return "Never been in before."
 	var lines: Array = ["Been in %d time%s." % [r["visits"], "" if r["visits"] == 1 else "s"]]
 	if r["fakes"] > 0:
@@ -304,10 +454,32 @@ func _memory(id: String) -> String:
 		lines.append("ROBBED THE SHOP.")
 	return "  ".join(lines)
 
-func _remember(id: String, what: String) -> void:
+## Everything the shop remembers about one caller. Older records get the new fields filled in (saves, later, merge the same way).
+const REC_DEFAULT := {"visits": 0, "fakes": 0, "robbed": 0, "trust": 50, "rejected": 0, "fair_deals": 0, "lowballs": 0,
+	"fake_exposed": 0, "last_day": 0, "rumor_heard": false, "paid_total": 0, "employed": false, "notes": []}
+var town := {"fakes_exposed": 0, "pell_sales": 0, "jo_sales": 0}    ## the week's story so far, for who says what
+var purchases: Array = []                  ## every piece you bought: {"name", "from", "day", "paid", "status", "sold_for", "to", "findings"}
+var accounts: Array = []                   ## each closed day's books
+
+func _rec(id: String) -> Dictionary:
 	if not rep.has(id):
-		rep[id] = {"visits": 0, "fakes": 0, "robbed": 0}
-	rep[id][what] += 1
+		rep[id] = REC_DEFAULT.duplicate(true)
+	else:
+		(rep[id] as Dictionary).merge(REC_DEFAULT.duplicate(true), false)
+	return rep[id]
+
+func _remember(id: String, what: String) -> void:
+	_rec(id)[what] += 1
+
+func _trust(id: String, d: int) -> void:
+	var r := _rec(id)
+	r["trust"] = clampi(int(r["trust"]) + d, 0, 100)
+
+## Something a caller told you, kept for the ledger (once).
+func _note(id: String, text: String) -> void:
+	var notes: Array = _rec(id)["notes"]
+	if not text in notes:
+		notes.append(text)
 
 func buzz_in() -> void:
 	feed.render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -334,7 +506,16 @@ func turn_away() -> void:
 	screen_mat.set_shader_parameter("on", 0.0)
 	_aim_at(Vector3.ZERO)
 	ui.hide_feed()
-	ui.say("", "You leave the door locked. After a moment they turn and trudge off up the lane.")
+	var vid: String = visitor["id"]
+	var reject := "You leave the door locked. After a moment they turn and trudge off up the lane."
+	if visitor["type"] == "robber":
+		reject = "\"Fine. Your loss.\" He trudges off up the lane." if vid == "robber" else "\"All right. I'm going.\" He trudges off up the lane."
+	elif Dialogue.SELLERS.has(vid):
+		reject = "\"%s\" They trudge off up the lane." % Dialogue.SELLERS[vid]["door_reject"]
+		if int(_rec(vid)["robbed"]) == 0:
+			_remember(vid, "rejected")
+			_trust(vid, -6)
+	ui.say(String(visitor["info"]["name"]) if int(_rec(vid)["visits"]) > 0 else "", reject)
 	ui.fade_speech(3.5)
 	var r: Dictionary = rep.get(String(visitor["id"]), {})
 	if visitor["type"] != "robber" and int(r.get("robbed", 0)) == 0 and int(r.get("fakes", 0)) == 0:
@@ -452,8 +633,14 @@ func _arrived() -> void:
 		ask = maxi(5, roundi(belief * 1.25 / 5.0) * 5)
 		item["floor"] = maxi(3, roundi(belief * float(info["floor"])))
 		patience = int(info["patience"])
-		var hello: Array = info["hello"]
-		_say(info["name"], "%s\n\"I'd want $%d for this %s.\"" % [hello[rng.randi() % hello.size()], ask, String(item["name"]).to_lower()])
+		var id: String = visitor["id"]
+		var r := _rec(id)
+		r["last_day"] = day
+		var hello := Dialogue.greeting(id, r, town)
+		_note(id, hello)
+		if id == "drifter" and hello == Dialogue.SELLERS["drifter"]["visits"][3]:
+			r["employed"] = true                         ## he has work at the lodge now: no more desperate nights
+		_say(info["name"], "%s\n\"I'd want $%d for this %s.\"" % [hello, ask, String(item["name"]).to_lower()])
 		state = "talk"
 		ui.show_seller_actions()
 		if _free_slot() == Vector3.INF:                  ## say so before any haggling: nothing can be bought until a piece sells
@@ -526,6 +713,7 @@ func _robbery(info: Dictionary) -> void:
 
 ## Give him what is in the till: he takes most of it and goes. Safe, and expensive.
 func rob_pay() -> void:
+	_rec(visitor["id"])["trust"] = 0
 	var take := mini(money, clampi(roundi(money * 0.3 / 5.0) * 5, 60, 150))      ## a bad day, not the end of the shop
 	money -= take
 	ui.cash(-take)
@@ -536,6 +724,7 @@ func rob_pay() -> void:
 
 ## The alarm under the counter: usually he runs empty-handed, sometimes he grabs the best thing off a shelf first.
 func rob_alarm() -> void:
+	_rec(visitor["id"])["trust"] = 0
 	_remember(visitor["id"], "robbed")
 	var info: Dictionary = visitor["info"]
 	if rng.randf() < 0.6 or stock.is_empty():
@@ -548,10 +737,14 @@ func rob_alarm() -> void:
 	if best["node"] != null and is_instance_valid(best["node"]):
 		(best["node"] as Node3D).queue_free()
 	stock.erase(best)
+	var lost: Dictionary = best.get("record", {})
+	lost["status"] = "stolen"
 	_leave("%s (The %s.)" % [String(info["grab"]), String(best["item"]["name"]).to_lower()], true)
 
 func _end_day() -> void:
 	state = "day_end"
+	accounts.append({"day": day, "spent": day_log["spent"], "earned": day_log["earned"], "profit": day_log["profit"], "robbed": day_log["robbed"],
+		"bought": day_log["bought"], "sold": day_log["sold"], "money": money})
 	if cinematics:
 		await _close_shot()
 	var books := "Bought %d, sold %d.\nCash out $%d, cash in $%d%s.\nProfit on what you sold: $%d.\nIn the till at closing: $%d.   On the shelves: %d piece%s worth about $%d." % [
@@ -950,6 +1143,9 @@ func make_offer(offer: int) -> void:
 		_buy(ask)
 		return
 	if offer < floor_p * 0.6:
+		if not "lowball" in visitor.get("standing", []):
+			_remember(visitor["id"], "lowballs")
+			_trust(visitor["id"], -5)
 		_standing(-4, "lowball")
 		patience -= 2
 		if patience <= 0:
@@ -968,7 +1164,10 @@ func make_offer(offer: int) -> void:
 		if offer >= floor_p and patience <= 1:
 			_buy(offer)
 			return
-		_say(info["name"], String(info["counter"]) % ("$%d" % ask))
+		if ask <= floor_p and Dialogue.SELLERS.has(visitor["id"]):
+			_say(info["name"], "\"" + String(Dialogue.SELLERS[visitor["id"]]["final"]) % ("$%d" % ask) + "\"")
+		else:
+			_say(info["name"], String(info["counter"]) % ("$%d" % ask))
 	ui.show_haggle(item, ask, patience)
 
 func accept_ask() -> void:
@@ -989,6 +1188,15 @@ func _buy(price: int) -> void:
 	money -= price
 	if not "lowball" in visitor.get("standing", []):
 		_standing(2, "fair")
+		_remember(visitor["id"], "fair_deals")
+		_trust(visitor["id"], 4)
+	_rec(visitor["id"])["paid_total"] += price
+	var found: Array = []
+	for c: Dictionary in item["clues"]:
+		if c["id"] in item["found"]:
+			found.append(String(c["text"]))
+	var bought := {"name": String(item["name"]), "from": String(info["name"]), "day": day, "paid": price, "status": "shelf", "findings": found}
+	purchases.append(bought)
 	day_log["bought"] += 1
 	day_log["spent"] += price
 	ui.cash(-price)
@@ -1003,7 +1211,7 @@ func _buy(price: int) -> void:
 		n.global_transform = g
 		create_tween().tween_property(n, "global_position", slot + Vector3(0, 0.12, 0), 0.6).set_trans(Tween.TRANS_SINE)
 		create_tween().tween_property(n, "scale", Vector3.ONE * 0.9, 0.6)
-	stock.append({"item": item, "paid": price, "node": n, "slot": slot})
+	stock.append({"item": item, "paid": price, "node": n, "slot": slot, "record": bought})
 	pivot.scale = Vector3.ONE
 	_leave(info["accept"])
 
@@ -1026,11 +1234,13 @@ func _buyer_arrived(info: Dictionary) -> void:
 	for st: Dictionary in stock:
 		if st["item"]["cat"] in wanted:
 			choices.append(st)
+	var hello := Dialogue.greeting(visitor["id"], _rec(visitor["id"]), town)
+	_note(visitor["id"], hello)
 	if choices.is_empty():
-		_say(info["name"], "%s\nHm. Nothing here for me today." % info["hello"])
+		_say(info["name"], "%s\n%s" % [hello, Dialogue.BUYERS[visitor["id"]]["empty"]])
 		get_tree().create_timer(2.5).timeout.connect(func() -> void: _leave("Maybe next time."))
 		return
-	_say(info["name"], "%s\nWhat have you got?" % info["hello"])
+	_say(info["name"], "%s\nWhat have you got?" % hello)
 	ui.show_present_choices(choices)
 
 ## You choose which piece to show the buyer (they never pick by its hidden value). An expert sees through a copy every time;
@@ -1068,6 +1278,11 @@ func sell_accept() -> void:
 	day_log["sold"] += 1
 	day_log["earned"] += ask
 	day_log["profit"] += ask - int(deal["paid"])
+	var sold: Dictionary = deal.get("record", {})
+	sold["status"] = "sold"
+	sold["sold_for"] = ask
+	sold["to"] = String(visitor["info"]["name"])
+	town["pell_sales" if visitor["id"] == "collector_b" else "jo_sales"] += 1
 	week_profit += ask - int(deal["paid"])
 	ui.cash(ask)
 	if deal["node"] != null and is_instance_valid(deal["node"]):

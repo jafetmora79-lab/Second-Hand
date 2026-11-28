@@ -82,6 +82,7 @@ func _ready() -> void:
 	_build_inspect()
 	_build_haggle()
 	_build_hint()
+	_build_ledger_button()
 	_build_tip()
 	_title = UiStyle.title_label("", 64, UiStyle.CREAM)
 	_title.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -335,6 +336,131 @@ func _build_tip() -> void:
 	skip.pressed.connect(func() -> void: game.skip_tutorial())
 	h.add_child(skip)
 
+# ---- the ledger: customers, antiques, accounts (only what you've found out) -------------------------------------------------------
+
+var _ledger: Control = null
+var _ledger_tab := "customers"
+var _ledger_body: VBoxContainer
+var _ledger_tabs: Dictionary = {}
+
+func _build_ledger_button() -> void:
+	var b := Button.new()
+	b.text = "Ledger (L)"
+	UiStyle.style_button(b, "paper", 13)
+	b.anchor_left = 0.5
+	b.anchor_right = 0.5
+	b.offset_left = -70
+	b.offset_right = 70
+	b.offset_top = 18
+	b.offset_bottom = 58
+	b.pressed.connect(toggle_ledger)
+	b.name = "LedgerButton"
+	add_child(b)
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_L:
+		toggle_ledger()
+	elif event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ESCAPE and _ledger != null:
+		toggle_ledger()
+		get_viewport().set_input_as_handled()
+
+func toggle_ledger() -> void:
+	if cinema:
+		return
+	if _ledger != null:
+		_ledger.queue_free()
+		_ledger = null
+		return
+	var dim := ColorRect.new()                               ## the shop dims behind the book; clicks stop here
+	dim.color = Color(0, 0, 0, 0.45)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(dim)
+	_ledger = dim
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(center)
+	var book := PanelContainer.new()
+	book.add_theme_stylebox_override("panel", UiStyle.parchment_box(26.0, "parch_tall"))
+	book.custom_minimum_size = Vector2(760, 560)
+	center.add_child(book)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	book.add_child(v)
+	var head := HBoxContainer.new()
+	var title := _ink("THE LEDGER", 26)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	var close := Button.new()
+	close.text = "Close"
+	UiStyle.style_button(close, "paper", 13)
+	close.pressed.connect(toggle_ledger)
+	head.add_child(close)
+	v.add_child(head)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 8)
+	_ledger_tabs.clear()
+	for t: Array in [["customers", "Customers"], ["antiques", "Antiques"], ["accounts", "Accounts"]]:
+		var tb := Button.new()
+		tb.text = t[1]
+		var key: String = t[0]
+		tb.pressed.connect(func() -> void:
+			_ledger_tab = key
+			_fill_ledger())
+		tabs.add_child(tb)
+		_ledger_tabs[key] = tb
+	v.add_child(tabs)
+	v.add_child(_rule())
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(700, 400)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
+	_ledger_body = VBoxContainer.new()
+	_ledger_body.add_theme_constant_override("separation", 10)
+	_ledger_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_ledger_body)
+	_fill_ledger()
+
+func _fill_ledger() -> void:
+	for key: String in _ledger_tabs.keys():
+		UiStyle.style_button(_ledger_tabs[key], "go" if key == _ledger_tab else "paper", 13)
+	for c in _ledger_body.get_children():
+		c.queue_free()
+	var rows: Array
+	match _ledger_tab:
+		"customers":
+			rows = game.ledger_customers()
+			if rows.is_empty():
+				_ledger_body.add_child(_ink("Nobody has come through the door yet.", 13, UiStyle.INK_SOFT))
+			for r: Dictionary in rows:
+				_ledger_body.add_child(_ink(String(r["name"]), 18))
+				_ledger_body.add_child(_ink(String(r["facts"]), 13, UiStyle.INK_SOFT))
+				for n: String in r["notes"]:
+					var l := _ink("  \"%s\"" % n, 13)
+					l.custom_minimum_size = Vector2(680, 0)
+					_ledger_body.add_child(l)
+		"antiques":
+			rows = game.ledger_antiques()
+			if rows.is_empty():
+				_ledger_body.add_child(_ink("You haven't bought anything yet.", 13, UiStyle.INK_SOFT))
+			for r: Dictionary in rows:
+				_ledger_body.add_child(_ink(String(r["name"]), 18))
+				_ledger_body.add_child(_ink(String(r["fate"]), 13, UiStyle.INK_SOFT))
+				for f: String in r["findings"]:
+					var l2 := _ink("  - " + f, 13)
+					l2.custom_minimum_size = Vector2(680, 0)
+					_ledger_body.add_child(l2)
+		_:
+			rows = game.ledger_accounts()
+			var total := 0
+			for r: Dictionary in rows:
+				var head := "Day %d%s" % [r["day"], " (so far)" if r.get("today", false) else ""]
+				_ledger_body.add_child(_ink(head, 18))
+				var robbed := ("   robbed of $%d" % r["robbed"]) if int(r["robbed"]) > 0 else ""
+				_ledger_body.add_child(_ink("Bought %d, sold %d.   Out $%d, in $%d.   Profit on sales $%d.%s   Till $%d." % [r["bought"], r["sold"], r["spent"], r["earned"], r["profit"], robbed, r["money"]], 13, UiStyle.INK_SOFT))
+				total += int(r["profit"])
+			_ledger_body.add_child(_rule())
+			_ledger_body.add_child(_ink("Profit on sales so far: $%d.   Rent of $%d due on day %d." % [total, game.RENT, game.RENT_DAY], 18))
+
 ## A tick, a warning or a cross for a finding, drawn (the pixel font has no such symbols).
 class Mark extends Control:
 	var kind := "good"
@@ -408,10 +534,16 @@ func _action(text: String, cb: Callable, kind: String = "wood") -> void:
 func show_door(title: String, look: String, note: String, tex: Texture2D) -> void:
 	_feed_tex = tex
 	say(title, look + "\n" + note)
+	show_door_actions(true)
+
+## The door's choices; you can ask a caller what they want once.
+func show_door_actions(can_ask: bool) -> void:
 	hide_actions()
 	_action("Let them in", func() -> void:
 		hide_actions()
 		game.buzz_in(), "go")
+	if can_ask:
+		_action("Ask what they want", func() -> void: game.ask_door())
 	_action("Turn them away", func() -> void:
 		hide_actions()
 		game.turn_away(), "stop")
@@ -436,7 +568,21 @@ func show_seller_actions() -> void:
 	_action("Make an offer", func() -> void:
 		hide_actions()
 		game.start_haggle())
+	if game.can_confront():                                  ## only once you've found the tell
+		_action("\"This is a copy.\"", func() -> void: game.confront(), "dark")
+	if game.can_talk():
+		_action("Say something...", func() -> void: show_talk_choices())
 	_action("Not interested", func() -> void: game.decline(), "stop")
+
+## The three things you can say to a seller (once a visit).
+func show_talk_choices() -> void:
+	hide_actions()
+	for c: Array in Dialogue.CHOICES:
+		var kind: String = c[0]
+		_action(c[1], func() -> void:
+			hide_actions()
+			game.talk(kind), "paper")
+	_action("Never mind", func() -> void: show_seller_actions(), "stop")
 
 ## A buyer is here: show them one of the pieces they collect (what you paid is beside each), or nothing.
 func show_present_choices(choices: Array) -> void:
