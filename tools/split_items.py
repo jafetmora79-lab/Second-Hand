@@ -17,7 +17,7 @@ ITEMS = os.path.join(ROOT, "assets", "items")
 WATCH_BODY = "(y > 0.1 and ((((x+0.05)**2+(z+0.05)**2)**0.5 < 0.335 and x < 0.265) or (abs(x+0.03) < 0.15 and z > 0.2)))"
 # per kind: parts in Blender coordinates (Z up). A hinge closes about `axis` until the part lies flat across `normal` at `cap`.
 SPEC = {
-    "music_box": {"unstack": True, "keep": "dark", "unstack_where": "abs(x) > 0.41 or y < -0.41 or z < -0.38 or z > 0.0 or y > 0.38", "parts": [   ## the inlaid outer panels only; its inlays are the darker layer
+    "music_box": {"unstack": True, "unstack_gap": 0.016, "unstack_sink": 0.012, "keep": "dark", "unstack_where": "(abs(x) > 0.41 or y < -0.41 or z < -0.38 or y > 0.38) and z < -0.03", "parts": [   ## the inlaid outer panels only; its inlays are the darker layer
         {"name": "Lid", "pick": "z > -0.02 and y > 0.15", "type": "hinge", "axis": "X", "normal": Vector((0, 0, 1))},
     ]},
     "compass": {"parts": [
@@ -50,7 +50,7 @@ def dedupe(obj):
     return len(dup)
 
 
-def unstack(obj, keep="bright", where="True", gap=0.004):
+def unstack(obj, keep="bright", where="True", gap=0.004, sink=0.0):
     """Faces lying on top of other faces (Meshy's inlays and panels: the same plane within a hair, one inside the other) flicker
     against each other in the game. Of each such pair, delete the darker one (the plain panel behind the inlay)."""
     from mathutils import kdtree
@@ -103,7 +103,17 @@ def unstack(obj, keep="bright", where="True", gap=0.004):
     bm = bmesh.new()
     bm.from_mesh(me)
     bm.faces.ensure_lookup_table()
-    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in gone], context="FACES")
+    faces = [bm.faces[i] for i in gone]
+    if sink > 0.0:
+        # push the under-layer back behind the one meant to show, instead of deleting it: where the top layer doesn't cover it, it
+        # still shows (a hair deeper), so nothing opens up; where it does, the top layer always wins
+        res = bmesh.ops.split(bm, geom=faces)
+        for f in [g for g in res["geom"] if isinstance(g, bmesh.types.BMFace)]:
+            n = f.normal.copy()
+            for v in f.verts:
+                v.co -= n * sink
+    else:
+        bmesh.ops.delete(bm, geom=faces, context="FACES")
     bm.to_mesh(me)
     bm.free()
     return len(gone)
@@ -220,7 +230,7 @@ def run(kind):
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     print(kind, "duplicate faces removed:", dedupe(body))
     if spec.get("unstack", False):                               ## only where flicker was seen: elsewhere the layers are the model's shape
-        print(kind, "stacked faces removed:", unstack(body, spec.get("keep", "bright"), spec.get("unstack_where", "True"), spec.get("unstack_gap", 0.004)))
+        print(kind, "stacked faces removed:", unstack(body, spec.get("keep", "bright"), spec.get("unstack_where", "True"), spec.get("unstack_gap", 0.004), spec.get("unstack_sink", 0.0)))
     out = {}
     parts = []
     for ps in spec["parts"]:
